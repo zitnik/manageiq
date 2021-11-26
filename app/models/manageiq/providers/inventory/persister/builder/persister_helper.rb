@@ -48,6 +48,10 @@ module ManageIQ::Providers::Inventory::Persister::Builder::PersisterHelper
     add_collection_for_manager("storage", collection_name, extra_properties, settings, &block)
   end
 
+  def add_physical_infra_collection(collection_name, extra_properties = {}, settings = {}, &block)
+    add_collection_for_manager("physical_infra", collection_name, extra_properties, settings, &block)
+  end
+
   # builder_class for add_collection()
   def cloud
     ::ManageIQ::Providers::Inventory::Persister::Builder::CloudManager
