@@ -33,7 +33,7 @@ gem "byebug",                                                :require => false
 gem "color",                            "~>1.8"
 gem "connection_pool",                                       :require => false # For Dalli
 gem "config",                           "~>2.2", ">=2.2.3",  :require => false
-gem "dalli",                            "~>3.0",             :require => false
+gem "dalli",                            "~>3.0.6",           :require => false
 gem "default_value_for",                "~>3.3"
 gem "docker-api",                       "~>1.33.6",          :require => false
 gem "elif",                             "=0.1.0",            :require => false
@@ -284,10 +284,6 @@ unless ENV["APPLIANCE"]
     gem "coveralls",                    "~>0.8.23",          :require => false
     gem "db-query-matchers",            "~>0.10.0"
     gem "factory_bot",                  "~>5.1",             :require => false
-
-    # TODO: faker is used for url generation in git repository factory and the lenovo
-    # provider, via a xclarity_client dependency
-    gem "faker",                        ">1.8",             :require => false
     gem "timecop",                      "~>0.9",             :require => false
     gem "vcr",                          "~>5.0",             :require => false
     gem "webmock",                      "~>3.7",             :require => false
