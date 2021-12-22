@@ -1063,7 +1063,7 @@
       :heartbeat_freq: 10.seconds
       :heartbeat_timeout: 2.minutes
       :memory_request: 500.megabytes
-      :memory_threshold: 1.gigabytes
+      :memory_threshold: 2.gigabytes
       :nice_delta: 10
       :parent_time_threshold: 3.minutes
       :poll: 3.seconds
