@@ -1087,11 +1087,11 @@
         :queue_timeout: 10.minutes
       :ems_metrics_collector_worker:
         :defaults:
-          :count: 2
+          :count: 1
           :nice_delta: 3
           :poll_method: escalate
       :ems_metrics_processor_worker:
-        :count: 2
+        :count: 1
         :nice_delta: 7
         :poll_method: escalate
       :ems_operations_worker: {}
@@ -1106,16 +1106,16 @@
       :event_handler:
         :nice_delta: 7
       :generic_worker:
-        :count: 2
+        :count: 1
       :priority_worker:
-        :count: 2
+        :count: 1
         :nice_delta: 1
         :poll: 1.seconds
       :reporting_worker:
-        :count: 2
+        :count: 1
         :nice_delta: 7
       :smart_proxy_worker:
-        :count: 2
+        :count: 1
         :memory_threshold: 2.gigabytes
         :queue_timeout: 20.minutes
         :heartbeat_thread_shutdown_timeout: 10.seconds
