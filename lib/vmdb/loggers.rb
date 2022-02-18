@@ -33,7 +33,9 @@ module Vmdb
       log_file = ManageIQ.root.join("log", log_file) if log_file.try(:dirname).to_s == "."
       progname = log_file.try(:basename, ".*").to_s
 
-      logger_class.new(log_file, progname: progname).tap do |logger|
+      logger_class.new(log_file, :progname => progname).tap do |logger|
+        ensure_log_file_permissions!(log_file)
+
         broadcast_logger = create_broadcast_logger
         if broadcast_logger
           logger.extend(ActiveSupport::Logger.broadcast(broadcast_logger))
@@ -44,6 +46,21 @@ module Vmdb
           logger.instance_variable_set(:@broadcast_logger, broadcast_logger) if Rails.env.test?
         end
       end
+    end
+
+    private_class_method def self.ensure_log_file_permissions!(log_file)
+      return unless log_file.kind_of?(Pathname)
+      return if !MiqEnvironment::Command.is_appliance? || MiqEnvironment::Command.is_podified?
+
+      file_perm = 0o660 # Allow members of the manageiq group to write to log files
+      file_uid  = MiqEnvironment.manageiq_uid
+      file_gid  = MiqEnvironment.manageiq_gid
+
+      stat = File.stat(log_file)
+
+      File.chmod(file_perm, log_file)          unless stat.mode & file_perm == file_perm
+      File.chown(file_uid, file_gid, log_file) unless stat.uid == file_uid && stat.gid == file_gid
+    rescue Errno::EPERM
     end
 
     private_class_method def self.create_loggers

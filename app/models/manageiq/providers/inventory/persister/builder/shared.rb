@@ -38,8 +38,10 @@ module ManageIQ::Providers::Inventory::Persister::Builder::Shared
     end
 
     def ext_management_system
+      skip_model_class
+
       add_properties(
-        :manager_ref       => %i(guid),
+        :manager_ref       => %i[guid],
         :custom_save_block => lambda do |ems, inventory_collection|
           ems_attrs = inventory_collection.data.first&.attributes
           ems.update!(ems_attrs) if ems_attrs
@@ -67,11 +69,21 @@ module ManageIQ::Providers::Inventory::Persister::Builder::Shared
         :attributes_blacklist   => %i[genealogy_parent parent resource_pool],
         :use_ar_object          => true, # Because of raw_power_state setter and hooks are needed for settings user
         :saver_strategy         => :default,
-        :batch_extra_attributes => %i(power_state state_changed_on previous_state),
+        :batch_extra_attributes => %i[power_state state_changed_on previous_state],
         :custom_reconnect_block => INVENTORY_RECONNECT_BLOCK
       )
 
       add_common_default_values
+    end
+
+    def cross_link_vms
+      add_properties(
+        :arel           => Vm,
+        :model_class    => Vm,
+        :parent         => nil,
+        :secondary_refs => {:by_uid_ems => %i[uid_ems]},
+        :strategy       => :local_db_find_references
+      )
     end
 
     def vm_and_template_labels
@@ -110,11 +122,18 @@ module ManageIQ::Providers::Inventory::Persister::Builder::Shared
       )
     end
 
+    def snapshots
+      add_properties(
+        :manager_ref                  => %i[vm_or_template uid],
+        :parent_inventory_collections => %i[vms miq_templates]
+      )
+    end
+
     def hardwares
       add_properties(
-        :manager_ref                  => %i(vm_or_template),
-        :parent_inventory_collections => %i(vms miq_templates),
-        :use_ar_object                => true, # TODO(lsmola) just because of default value on cpu_sockets, this can be fixed by separating instances_hardwares and images_hardwares
+        :manager_ref                  => %i[vm_or_template],
+        :parent_inventory_collections => %i[vms miq_templates],
+        :use_ar_object                => true # TODO(lsmola) just because of default value on cpu_sockets, this can be fixed by separating instances_hardwares and images_hardwares
       )
     end
 
@@ -141,23 +160,23 @@ module ManageIQ::Providers::Inventory::Persister::Builder::Shared
       end
 
       add_properties(
-        :manager_ref                  => %i(vm_or_template),
-        :parent_inventory_collections => %i(vms miq_templates),
+        :manager_ref                  => %i[vm_or_template],
+        :parent_inventory_collections => %i[vms miq_templates],
         :custom_save_block            => custom_save_block
       )
     end
 
     def networks
       add_properties(
-        :manager_ref                  => %i(hardware description),
-        :parent_inventory_collections => %i(vms)
+        :manager_ref                  => %i[hardware description],
+        :parent_inventory_collections => %i[vms]
       )
     end
 
     def disks
       add_properties(
-        :manager_ref                  => %i(hardware device_name),
-        :parent_inventory_collections => %i(vms)
+        :manager_ref                  => %i[hardware device_name],
+        :parent_inventory_collections => %i[vms]
       )
     end
 
@@ -175,7 +194,7 @@ module ManageIQ::Providers::Inventory::Persister::Builder::Shared
 
     def orchestration_stacks
       add_properties(
-        :attributes_blacklist => %i(parent),
+        :attributes_blacklist => %i[parent]
       )
 
       add_common_default_values

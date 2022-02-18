@@ -17,6 +17,7 @@ class Host < ApplicationRecord
     # DB            Displayed
     "microsoft"       => "Microsoft",
     "redhat"          => "RedHat",
+    "ovirt"           => "Ovirt",
     "kubevirt"        => "KubeVirt",
     "vmware"          => "VMware",
     "openstack_infra" => "OpenStack Infrastructure",
@@ -87,7 +88,7 @@ class Host < ApplicationRecord
                             :inverse_of => :host
   has_many                  :host_aggregate_hosts, :dependent => :destroy
   has_many                  :host_aggregates, :through => :host_aggregate_hosts
-  has_many :host_hardwares, :class_name => 'Hardware', :source => :hardware, :dependent => :nullify
+  has_many :host_hardwares, :class_name => 'Hardware', :dependent => :nullify
   has_many :vm_hardwares,   :class_name => 'Hardware', :through => :vms_and_templates, :source => :hardware
 
   # Physical server reference

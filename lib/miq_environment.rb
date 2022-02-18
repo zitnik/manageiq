@@ -22,6 +22,22 @@ module MiqEnvironment
     local_addr&.ip_address
   end
 
+  def self.manageiq_uid
+    @manageiq_uid ||= begin
+      Process::UID.from_name("manageiq") if Command.is_appliance?
+    rescue ArgumentError
+      nil
+    end
+  end
+
+  def self.manageiq_gid
+    @manageiq_gid ||= begin
+      Process::GID.from_name("manageiq") if Command.is_appliance?
+    rescue ArgumentError
+      nil
+    end
+  end
+
   class Command
     EVM_KNOWN_COMMANDS = %w[apachectl memcached memcached-tool nohup service systemctl].freeze
 
@@ -51,7 +67,10 @@ module MiqEnvironment
 
     def self.is_podified?
       return @is_podified unless @is_podified.nil?
-      @is_podified = is_container? && ContainerOrchestrator.available?
+
+      @is_podified = is_container? &&
+                     File.exist?("/run/secrets/kubernetes.io/serviceaccount/token") &&
+                     File.exist?("/run/secrets/kubernetes.io/serviceaccount/ca.crt")
     end
 
     def self.is_appliance?

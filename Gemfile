@@ -33,7 +33,7 @@ gem "byebug",                                                :require => false
 gem "color",                            "~>1.8"
 gem "connection_pool",                                       :require => false # For Dalli
 gem "config",                           "~>2.2", ">=2.2.3",  :require => false
-gem "dalli",                            "~>3.0.6",           :require => false
+gem "dalli",                            "~>3.1.0",           :require => false
 gem "default_value_for",                "~>3.3"
 gem "docker-api",                       "~>1.33.6",          :require => false
 gem "elif",                             "=0.1.0",            :require => false
@@ -64,7 +64,7 @@ gem "pg",                                                    :require => false
 gem "pg-dsn_parser",                    "~>0.1.0",           :require => false
 gem "query_relation",                   "~>0.1.0",           :require => false
 gem "rack-attack",                      "~>6.5.0",           :require => false
-gem "rails",                            "~>6.0.4", ">=6.0.4.1"
+gem "rails",                            "~>6.0.4", ">=6.0.4.6"
 gem "rails-i18n",                       "~>6.x"
 gem "rake",                             ">=12.3.3",          :require => false
 gem "rest-client",                      "~>2.1.0",           :require => false
@@ -131,6 +131,10 @@ end
 
 group :google, :manageiq_default do
   manageiq_plugin "manageiq-providers-google"
+end
+
+group :ibm_cic, :manageiq_default do
+  manageiq_plugin "manageiq-providers-ibm_cic"
 end
 
 group :ibm_cloud, :manageiq_default do
@@ -281,9 +285,9 @@ unless ENV["APPLIANCE"]
     gem "brakeman",                     "~>5.0",             :require => false
     gem "bundler-audit",                                     :require => false
     gem "capybara",                     "~>2.5.0",           :require => false
-    gem "coveralls",                    "~>0.8.23",          :require => false
     gem "db-query-matchers",            "~>0.10.0"
     gem "factory_bot",                  "~>5.1",             :require => false
+    gem "simplecov",                    ">=0.21.2",          :require => false
     gem "timecop",                      "~>0.9",             :require => false
     gem "vcr",                          "~>5.0",             :require => false
     gem "webmock",                      "~>3.7",             :require => false

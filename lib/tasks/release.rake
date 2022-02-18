@@ -34,8 +34,8 @@ task :release do
 
     FileUtils.rm([appliance_dependency, gemfile_lock])
 
-    content = lock_release.read
-    lock_release.write(content.gsub("branch: #{branch}", "tag: #{version}"))
+    lock_content = lock_release.read
+    lock_release.write(lock_content.gsub("branch: #{branch}", "tag: #{version}"))
   end
 
   # Change git based gem source to tag reference in Gemfile
@@ -52,9 +52,14 @@ task :release do
   # Tag
   exit $?.exitstatus unless system("git tag #{version} -m 'Release #{version}'")
 
-  # Revert the Gemfile update
+  # Revert the Gemfile and Gemfile.lock update
   gemfile.write(content)
-  exit $?.exitstatus unless system("git add #{gemfile}")
+  lock_release.write(lock_content) if lock_release.exist?
+
+  # Commit
+  files_to_update = [gemfile]
+  files_to_update << lock_release if lock_release.exist?
+  exit $?.exitstatus unless system("git add #{files_to_update.join(" ")}")
   exit $?.exitstatus unless system("git commit -m 'Revert Gemfile tag reference update and put back branch reference'")
 
   puts
@@ -100,11 +105,6 @@ namespace :release do
     content = dockerfile.read
     dockerfile.write(content.sub(/^(ARG IMAGE_REF=).+/, "\\1latest-#{branch}"))
 
-    # Modify docker-assets README
-    docker_readme = root.join("docker-assets", "README.md")
-    content = docker_readme.read
-    docker_readme.write(content.sub(%r{(manageiq-pods/tree/)[^/]+(/)}, "\\1#{branch}\\2"))
-
     # Modify VERSION
     version_file = root.join("VERSION")
     version_file.write("#{branch}-pre")
@@ -120,7 +120,7 @@ namespace :release do
     deprecation.write(content.sub(/(ActiveSupport::Deprecation.new\(")[^"]+(")/, "\\1#{next_branch.capitalize}\\2"))
 
     # Commit
-    files_to_update = [gemfile, dockerfile, docker_readme, version_file, vmdb_appliance, deprecation]
+    files_to_update = [gemfile, dockerfile, version_file, vmdb_appliance, deprecation]
     exit $?.exitstatus unless system("git add #{files_to_update.join(" ")}")
     exit $?.exitstatus unless system("git commit -m 'Changes for new branch #{branch}'")
 
@@ -187,6 +187,8 @@ namespace :release do
       exit 1
     end
 
+    update_gems = ENV["UPDATE_GEMS"].to_s.split(" ")
+
     root = Pathname.new(__dir__).join("../..")
 
     # Ensure that local and global bundler.d is not enabled
@@ -205,6 +207,13 @@ namespace :release do
       File.write(appliance_deps_file, appliance_deps)
 
       FileUtils.cp(root.join("Gemfile.lock.release"), root.join("Gemfile.lock"))
+
+      if update_gems.any?
+        Bundler.with_unbundled_env do
+          puts "** Updating gems #{update_gems.join(", ")}"
+          exit $?.exitstatus unless system({"APPLIANCE" => "true"}, "bundle update --conservative --patch #{update_gems.join(" ")}", :chdir => root)
+        end
+      end
 
       platforms = %w[
         ruby

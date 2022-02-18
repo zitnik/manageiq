@@ -41,11 +41,7 @@ class ExtManagementSystem < ApplicationRecord
   end
 
   def self.supported_types_for_create
-    permitted_subclasses.select(&:supported_for_create?)
-  end
-
-  def self.supported_for_create?
-    !reflections.include?("parent_manager")
+    subclasses_supporting(:create)
   end
 
   def self.label_mapping_prefixes
@@ -155,10 +151,9 @@ class ExtManagementSystem < ApplicationRecord
   supports_not :cloud_subnet_create
   supports_not :cloud_tenant_mapping
   supports_not :cloud_volume_create
+  supports_not :create_iso_datastore
   supports_not :console
   supports_not :discovery
-  supports_not :ems_network_new
-  supports_not :ems_storage_new
   supports_not :label_mapping
   supports_not :metrics
   supports_not :object_storage
@@ -202,7 +197,10 @@ class ExtManagementSystem < ApplicationRecord
   end
 
   def hostname_format_valid?
+    return unless hostname_required?
+    return unless hostname.present? # Presence is checked elsewhere
     return if hostname.ipaddress? || hostname.hostname?
+
     errors.add(:hostname, _("format is invalid."))
   end
 
@@ -301,10 +299,12 @@ class ExtManagementSystem < ApplicationRecord
   supports_attribute :feature => :cloud_volume
   supports_attribute :feature => :cloud_volume_create
   supports_attribute :supports_create_flavor, :child_model => "Flavor"
+  supports_attribute :supports_create_floating_ip, :child_model => "FloatingIp"
   supports_attribute :feature => :volume_availability_zones
   supports_attribute :supports_create_security_group, :child_model => "SecurityGroup"
   supports_attribute :supports_create_host_aggregate, :child_model => "HostAggregate"
   supports_attribute :feature => :create_network_router
+  supports_attribute :feature => :create_iso_datastore
   supports_attribute :feature => :storage_services
   supports_attribute :feature => :add_storage
   supports_attribute :feature => :add_host_initiator

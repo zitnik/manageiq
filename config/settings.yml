@@ -20,6 +20,7 @@
   :amazon_key:
   :amazon_secret:
 :binary_blob:
+  :keep_orphaned: 1.month
   :purge_window_size: 100
 :capacity:
   :profile:
@@ -93,7 +94,7 @@
   :container_provider: https://manageiq.org/docs/reference/latest/managing_providers/#containers-providers
   :infra_provider: https://manageiq.org/docs/reference/latest/managing_providers/#infrastructure-providers
   :network_provider: https://manageiq.org/docs/reference/latest/managing_providers/#network-managers
-  :physical_infra_provider: https://www.manageiq.org/docs/reference/latest/managing_providers/#discovering-physical-infrastucture-providers
+  :physical_infra_provider: https://www.manageiq.org/docs/reference/latest/managing_providers/#physical-infrastucture-providers
   :storage_manager: https://www.manageiq.org/docs/reference/latest/managing_providers/#storage-managers
 
 :drift_states:
@@ -806,7 +807,7 @@
   :path:
 :help_menu:
   :documentation:
-    :type: default
+    :type: new_window
   :product:
     :type: new_window
   :about:

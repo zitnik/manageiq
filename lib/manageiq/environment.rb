@@ -22,11 +22,7 @@ module ManageIQ
 
       ensure_config_files
 
-      create_database_user if ENV["CI"]
-
       setup_test_environment(:task_prefix => 'app:', :root => plugin_root) unless ENV["SKIP_TEST_RESET"]
-
-      prepare_codeclimate_test_reporter(plugin_root) if ENV["CI"]
     end
 
     def self.ensure_config_files
@@ -58,13 +54,15 @@ module ManageIQ
     end
 
     def self.install_bundler(root = APP_ROOT)
-      system!("echo 'gem: --no-ri --no-rdoc --no-document' > ~/.gemrc") if ENV['CI']
-      system!("gem install bundler -v '#{bundler_version}' --conservative")
-      system!("bundle config path #{root.join('vendor/bundle').expand_path}", :chdir => root) if ENV["CI"]
+      system!("gem install bundler -v '#{bundler_version}' --conservative") unless ENV["GITHUB_ACTIONS"]
     end
 
     def self.setup_gemfile_lock
-      return if ENV["TRAVIS_BRANCH"] == "master"
+      # Gemfile.lock.release only applies to non-master branches and PRs to non-master branches
+      return unless ENV["GITHUB_REPOSITORY_OWNER"] == "ManageIQ" &&
+                    ENV["GITHUB_BASE_REF"] != "master" && # PR to non-master branch
+                    ENV["GITHUB_REF_NAME"] != "master" && # A non-master branch
+                    !ENV["GITHUB_REF_NAME"].to_s.start_with?("dependabot/") # Dependabot makes branches in the core repo
 
       raise "Missing Gemfile.lock.release" unless APP_ROOT.join("Gemfile.lock.release").file?
       FileUtils.cp(APP_ROOT.join("Gemfile.lock.release"), APP_ROOT.join("Gemfile.lock"))
@@ -73,6 +71,7 @@ module ManageIQ
     def self.bundle_update(root = APP_ROOT)
       system!("bundle update --jobs=3", :chdir => root)
       return unless ENV["CI"]
+
       lockfile_contents = File.read(root.join("Gemfile.lock"))
       puts "===== Begin Gemfile.lock =====\n\n#{lockfile_contents}\n\n===== End Gemfile.lock ====="
     end
@@ -110,16 +109,6 @@ module ManageIQ
     def self.clear_logs_and_temp
       puts "\n== Removing old logs and tempfiles =="
       run_rake_task("log:clear tmp:clear")
-    end
-
-    def self.create_database_user
-      system!(%q(psql -c "CREATE USER root SUPERUSER PASSWORD 'smartvm';" -U postgres))
-    end
-
-    def self.prepare_codeclimate_test_reporter(root = APP_ROOT)
-      system!("curl -L https://codeclimate.com/downloads/test-reporter/test-reporter-latest-linux-amd64 > ./cc-test-reporter", :chdir => root)
-      system!("chmod +x ./cc-test-reporter", :chdir => root)
-      system!("./cc-test-reporter before-build", :chdir => root)
     end
 
     def self.update_ui
