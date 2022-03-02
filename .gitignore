@@ -36,7 +36,7 @@ REGION
 SyntaxCheck
 xfer_*.xml
 Thumbs.db
-Procfile
+#Procfile
 
 # config/
 config/apache
