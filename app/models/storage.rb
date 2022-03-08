@@ -513,6 +513,11 @@ class Storage < ApplicationRecord
       miq_task.state_active unless miq_task.nil?
     end
 
+    if ext_management_system.nil?
+      _log.warn("Storage: [#{name}] is not connected to an EMS.")
+      raise MiqException::MiqUnreachableStorage, _("Storage: [%{name}] is not connected to an EMS.") % {:name => name}
+    end
+
     unless ext_management_system.authentication_status_ok?
       message = "There are no EMSs with valid credentials connected to Storage: [#{name}] in Zone: [#{MiqServer.my_zone}]."
       _log.warn(message)
@@ -555,7 +560,8 @@ class Storage < ApplicationRecord
 
   def vm_ids_by_path
     host_ids = hosts.collect(&:id)
-    return nil if host_ids.empty?
+    return {} if host_ids.empty?
+
     Vm.where(:host_id => host_ids).includes(:storage).inject({}) do |h, v|
       h[File.dirname(v.path)] = v.id
       h
