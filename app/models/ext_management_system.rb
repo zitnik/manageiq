@@ -139,21 +139,22 @@ class ExtManagementSystem < ApplicationRecord
 
   serialize :options
 
-  supports_not :catalog
   supports_not :add_host_initiator
   supports_not :add_storage
   supports_not :add_volume_mapping
   supports_not :admin_ui
   supports_not :assume_role
   supports_not :block_storage
+  supports_not :catalog
   supports_not :change_password
   supports_not :cloud_object_store_container_create
   supports_not :cloud_subnet_create
   supports_not :cloud_tenant_mapping
   supports_not :cloud_volume_create
-  supports_not :create_iso_datastore
   supports_not :console
+  supports_not :create_iso_datastore
   supports_not :discovery
+  supports_not :events
   supports_not :label_mapping
   supports_not :metrics
   supports_not :object_storage
@@ -293,7 +294,7 @@ class ExtManagementSystem < ApplicationRecord
   supports_attribute :feature => :cloud_tenants
   supports_attribute :feature => :volume_multiattachment
   supports_attribute :feature => :volume_resizing
-  supports_attribute :feature => :cloud_object_store_container_create
+  supports_attribute :supports_cloud_object_store_container_create, :child_model => "CloudObjectStoreContainer"
   supports_attribute :feature => :cinder_volume_types
   supports_attribute :feature => :cloud_subnet_create
   supports_attribute :feature => :cloud_volume
