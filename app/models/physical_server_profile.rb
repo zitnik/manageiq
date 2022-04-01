@@ -14,6 +14,6 @@ class PhysicalServerProfile < ApplicationRecord
   belongs_to :ext_management_system, :foreign_key => :ems_id, :inverse_of => :physical_server_profiles,
     :class_name => "ManageIQ::Providers::PhysicalInfraManager"
 
-  has_one :physical_server, :as => :assigned_server
+  belongs_to :physical_server, :foreign_key => :assigned_server_id, optional: true, :class_name => "ManageIQ::Providers::PhysicalInfraManager::PhysicalServer"
 
 end
