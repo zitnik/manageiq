@@ -25,15 +25,16 @@ schedule: ruby lib/workers/bin/run_single_worker.rb MiqScheduleWorker
 # These workers use a default queue defined in their classes
 # We do not need to pass them a queue name
 
-#generic:           ruby lib/workers/bin/run_single_worker.rb MiqGenericWorker
-priority:          ruby lib/workers/bin/run_single_worker.rb MiqPriorityWorker
-event:             ruby lib/workers/bin/run_single_worker.rb MiqEventHandler
-reporting:         ruby lib/workers/bin/run_single_worker.rb MiqReportingWorker
+generic:           ruby lib/workers/bin/run_single_worker.rb MiqGenericWorker
+#priority:          ruby lib/workers/bin/run_single_worker.rb MiqPriorityWorker
+#event:             ruby lib/workers/bin/run_single_worker.rb MiqEventHandler
+#reporting:         ruby lib/workers/bin/run_single_worker.rb MiqReportingWorker
 #metrics_processor: ruby lib/workers/bin/run_single_worker.rb MiqEmsMetricsProcessorWorker
 
 # Provider workers
 #
 # If you are unsure which workers to start, you can run `ruby lib/workers/bin/run_single_worker.rb -l` to list the workers available
+#cisco_intersight_refresh_20: ruby lib/workers/bin/run_single_worker.rb --ems-id 20 ManageIQ::Providers::CiscoIntersight::PhysicalInfraManager::RefreshWorker
 
 # VMware example
 # The following worker should be started to work with a VMware infrastructure EMS
