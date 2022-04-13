@@ -275,31 +275,12 @@ namespace :locale do
 
       po_files = {}
 
-      # TODO: Domains for po and mo are added with the same path in Vmdb::FastGettextHelper.register_locales
-      # We need to uniq them for now, otherwise we find and merge the same po files.
-      Vmdb::Gettext::Domains.paths.uniq.each do |path|
+      Vmdb::Gettext::Domains.po_paths.each do |path|
         files = ::Pathname.glob(::File.join(path, "**", "*.po"))
         files.each do |file|
           locale = file.dirname.basename.to_s
           po_files[locale] ||= []
           po_files[locale].push(file)
-        end
-      end
-
-      js_plugins = {} # currently we don't need to download any catalogs from JS/node plugins
-
-      plugins_dir = File.join(Rails.root, 'locale/plugins')
-      Dir.mkdir(plugins_dir, 0o700)
-      js_plugins.each do |plugin, content|
-        plugin_dir = File.join(plugins_dir, plugin)
-        Dir.mkdir(plugin_dir)
-        content.each do |lang, url|
-          lang_dir = File.join(plugin_dir, lang)
-          Dir.mkdir(lang_dir)
-          lang_file = "#{lang_dir}/#{url.split('/')[-1]}"
-          ManageIQ::Environment.system!("curl -f -o #{lang_file} #{url}")
-          po_files[lang] ||= []
-          po_files[lang].push(Pathname(lang_file))
         end
       end
 
@@ -334,7 +315,7 @@ namespace :locale do
       # This depends on PoToJson overrides as defined in lib/tasks/po_to_json_override.rb
       Rake::Task['gettext:po_to_json'].invoke
     ensure
-      system "rm -rf #{combined_dir} #{plugins_dir}"
+      system "rm -rf #{combined_dir}"
     end
   end
 
