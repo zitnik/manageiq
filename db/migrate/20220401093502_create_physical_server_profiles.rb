@@ -5,6 +5,7 @@ class CreatePhysicalServerProfiles < ActiveRecord::Migration[6.0]
       t.string :ems_ref
       t.string :name
       t.references :assigned_server, :type => :bigint, :index => true, :references => :physical_server
+      t.references :associated_server, :type => :bigint, :index => true, :references => :physical_server
 
       t.timestamps
     end
