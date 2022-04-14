@@ -34,7 +34,7 @@ generic:           ruby lib/workers/bin/run_single_worker.rb MiqGenericWorker
 # Provider workers
 #
 # If you are unsure which workers to start, you can run `ruby lib/workers/bin/run_single_worker.rb -l` to list the workers available
-#cisco_intersight_refresh_20: ruby lib/workers/bin/run_single_worker.rb --ems-id 20 ManageIQ::Providers::CiscoIntersight::PhysicalInfraManager::RefreshWorker
+cisco_intersight_refresh_20: ruby lib/workers/bin/run_single_worker.rb --ems-id 20 ManageIQ::Providers::CiscoIntersight::PhysicalInfraManager::RefreshWorker
 
 # VMware example
 # The following worker should be started to work with a VMware infrastructure EMS
