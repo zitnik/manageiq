@@ -1,7 +1,6 @@
 class PhysicalServerProfile < ApplicationRecord
   acts_as_miq_taggable
 
-  # TODO which ones of these are really needed? (copied from physical_server)
   include NewWithTypeStiMixin
   include MiqPolicyMixin
   include TenantIdentityMixin
@@ -22,5 +21,9 @@ class PhysicalServerProfile < ApplicationRecord
   def my_zone
     ems = ext_management_system
     ems ? ems.my_zone : MiqServer.my_zone
+  end
+
+  def event_where_clause(assoc = :ems_events)
+    ["#{events_table_name(assoc)}.physical_server_profile_id = ?", id]
   end
 end
