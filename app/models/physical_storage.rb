@@ -5,36 +5,37 @@ class PhysicalStorage < ApplicationRecord
   include SupportsFeatureMixin
   include CustomActionsMixin
   include EmsRefreshMixin
+  include EventMixin
+
+  # The physical-storage is expected to have san_addresses of its own in the future (The real addresses through which it actually connects to the SAN).
+  # Therefore, the name san_addresses is reserved for the physical-storages actual san-addresses, and for all of the san_addresses configured in the physical-storage's host_initiators we refer as registered_initiator_addresses.
 
   belongs_to :ext_management_system, :foreign_key => :ems_id
   belongs_to :physical_rack
   belongs_to :physical_chassis, :inverse_of => :physical_storages
+  belongs_to :physical_storage_family, :inverse_of => :physical_storages
+
+  has_one :hardware, :through => :computer_system
+  has_one :computer_system, :as => :managed_entity, :dependent => :destroy
+  has_one :asset_detail, :as => :resource, :dependent => :destroy, :inverse_of => false
 
   has_many :storage_resources, :dependent => :destroy
   has_many :host_initiators, :dependent => :destroy
   has_many :host_initiator_groups, :dependent => :destroy
-
-  # The physical-storage is expected to have san_addresses of its own in the future (The real addresses through which it actually connects to the SAN).
-  # Therefore, the name san_addresses is reserved for the physical-storages actual san-addresses, and for all of the san_addresses configured in the physical-storage's host_initiators we refer as registered_initiator_addresses.
   has_many :registered_initiator_addresses, :through => :host_initiators, :source => :san_addresses
-
-  belongs_to :physical_storage_family, :inverse_of => :physical_storages
-
-  has_one :asset_detail, :as => :resource, :dependent => :destroy, :inverse_of => false
-
   has_many :canisters, :dependent => :destroy, :inverse_of => false
   has_many :physical_disks, :dependent => :destroy, :inverse_of => :physical_storage
-
-  has_one :computer_system, :as => :managed_entity, :dependent => :destroy
-  has_one :hardware, :through => :computer_system
-
   has_many :canister_computer_systems, :through => :canisters, :source => :computer_system
   has_many :guest_devices, :through => :hardware
-
   has_many :wwpn_candidates, :dependent => :destroy
+  has_many :event_streams, :dependent => :nullify
+
+  supports :timeline
 
   supports_not :create
   supports_not :delete
+  supports_not :update_physical_storage
+  supports_not :validate
   acts_as_miq_taggable
 
   def my_zone
@@ -65,6 +66,36 @@ class PhysicalStorage < ApplicationRecord
       :queue_name  => ext_management_system.queue_name_for_ems_operations,
       :zone        => ext_management_system.my_zone,
       :args        => []
+    }
+    MiqTask.generic_action_with_callback(task_opts, queue_opts)
+  end
+
+  def self.raw_validate_physical_storage(_ext_management_system, _options = {})
+    raise NotImplementedError, _("raw_validate_physical_storage must be implemented in a subclass")
+  end
+
+  def self.validate_physical_storage(ems_id, options = {})
+    raise ArgumentError, _("ems_id cannot be nil") if ems_id.nil?
+
+    ext_management_system = ExtManagementSystem.find_by(:id => ems_id)
+    raise ArgumentError, _("ext_management_system cannot be found") if ext_management_system.nil?
+
+    klass = ext_management_system.class_by_ems(:PhysicalStorage)
+    klass.raw_validate_physical_storage(ext_management_system, options)
+  end
+
+  def self.validate_storage_queue(userid, ext_management_system, options = {})
+    task_opts = {
+      :action => "validating PhysicalStorage for user #{userid}",
+      :userid => userid
+    }
+    queue_opts = {
+      :class_name  => 'PhysicalStorage',
+      :method_name => 'validate_physical_storage',
+      :role        => 'ems_operations',
+      :queue_name  => ext_management_system.queue_name_for_ems_operations,
+      :zone        => ext_management_system.my_zone,
+      :args        => [ext_management_system.id, options]
     }
     MiqTask.generic_action_with_callback(task_opts, queue_opts)
   end
@@ -128,11 +159,16 @@ class PhysicalStorage < ApplicationRecord
     raw_update_physical_storage(options)
   end
 
-  def validate_update_physical_storage
-    validate_unsupported("Update Volume Operation")
-  end
-
   def raw_update_physical_storage(_options = {})
     raise NotImplementedError, _("raw_update_volume must be implemented in a subclass")
+  end
+
+  def event_where_clause(assoc = :ems_events)
+    case assoc.to_sym
+    when :ems_events, :event_streams
+      return ["#{events_table_name(assoc)}.physical_storage_id = ?", id]
+    when :policy_events
+      return ["target_id = ? and target_class = ? ", id, self.class.base_class.name]
+    end
   end
 end

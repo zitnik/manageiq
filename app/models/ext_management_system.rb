@@ -87,6 +87,7 @@ class ExtManagementSystem < ApplicationRecord
   has_many :disks,             :through => :hardwares
   has_many :physical_servers,         :foreign_key => :ems_id, :inverse_of => :ext_management_system, :dependent => :destroy
   has_many :physical_server_profiles, :foreign_key => :ems_id, :inverse_of => :ext_management_system, :dependent => :destroy
+  has_many :placement_groups,         :foreign_key => :ems_id, :inverse_of => :ext_management_system, :dependent => :destroy
 
   has_many :vm_and_template_labels, :through => :vms_and_templates, :source => :labels
   # Only taggings mapped from labels, excluding user-assigned tags.
@@ -217,7 +218,7 @@ class ExtManagementSystem < ApplicationRecord
 
   # validation - Zone cannot be maintenance_zone when enabled == true
   def validate_zone_not_maintenance_when_ems_enabled?
-    if enabled? && zone.present? && zone == Zone.maintenance_zone
+    if enabled? && zone&.maintenance?
       errors.add(:zone, N_("cannot be the maintenance zone when provider is active"))
     end
   end
@@ -226,7 +227,6 @@ class ExtManagementSystem < ApplicationRecord
   include UuidMixin
   include EmsRefresh::Manager
   include TenancyMixin
-  include AvailabilityMixin
   include SupportsFeatureMixin
   include ComplianceMixin
   include CustomAttributeMixin
@@ -300,6 +300,7 @@ class ExtManagementSystem < ApplicationRecord
   supports_attribute :feature => :cloud_subnet_create
   supports_attribute :feature => :cloud_volume
   supports_attribute :feature => :cloud_volume_create
+  supports_attribute :supports_cloud_database_create, :child_model => "CloudDatabase"
   supports_attribute :supports_create_flavor, :child_model => "Flavor"
   supports_attribute :supports_create_floating_ip, :child_model => "FloatingIp"
   supports_attribute :feature => :volume_availability_zones
@@ -328,7 +329,7 @@ class ExtManagementSystem < ApplicationRecord
   #                            we need to specify original zone for children explicitly
   def pause!(orig_zone = nil)
     previous_zone = orig_zone || zone
-    if previous_zone == Zone.maintenance_zone
+    if previous_zone.maintenance?
       _log.warn("Trying to pause paused EMS [#{name}] id [#{id}]. Skipping.")
       return
     end
@@ -363,7 +364,7 @@ class ExtManagementSystem < ApplicationRecord
     _log.info("Resuming EMS [#{name}] id [#{id}].")
 
     new_zone = if zone_before_pause.nil?
-                 zone == Zone.maintenance_zone ? Zone.default_zone : zone
+                 zone.maintenance? ? Zone.default_zone : zone
                else
                  zone_before_pause
                end
@@ -406,7 +407,7 @@ class ExtManagementSystem < ApplicationRecord
       ems_klass, ems_name = if ost.hypervisor.include?(:scvmm)
                               [ManageIQ::Providers::Microsoft::InfraManager, 'SCVMM']
                             elsif ost.hypervisor.include?(:rhevm)
-                              [ManageIQ::Providers::Redhat::InfraManager, 'RHEV-M']
+                              [ManageIQ::Providers::Ovirt::InfraManager, 'RHEV-M']
                             elsif ost.hypervisor.include?(:openstack_infra)
                               [ManageIQ::Providers::Openstack::InfraManager, 'OpenStack Director']
                             else

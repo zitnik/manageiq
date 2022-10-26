@@ -141,7 +141,7 @@ FactoryBot.define do
 
   factory :automation_manager,
           :aliases => ["manageiq/providers/automation_manager"],
-          :class   => "ManageIQ::Providers::AnsibleTower::AutomationManager",
+          :class   => "ManageIQ::Providers::Awx::AutomationManager",
           :parent  => :ext_management_system
 
   factory :provisioning_manager,
@@ -285,13 +285,6 @@ FactoryBot.define do
   factory :ems_amazon_with_authentication,
           :parent => :ems_amazon do
     authtype { "default" }
-  end
-
-  factory :ems_amazon_with_cloud_networks,
-          :parent => :ems_amazon do
-    after(:create) do |x|
-      2.times { x.cloud_networks << FactoryBot.create(:cloud_network_amazon) }
-    end
   end
 
   factory :ems_azure,

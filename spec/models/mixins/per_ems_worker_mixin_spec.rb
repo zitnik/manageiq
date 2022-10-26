@@ -1,7 +1,7 @@
 RSpec.describe PerEmsWorkerMixin do
   before do
-    _guid, server, zone = EvmSpecHelper.create_guid_miq_server_zone
-    @ems = FactoryBot.create(:ems_vmware, :with_unvalidated_authentication, :zone => zone)
+    server = EvmSpecHelper.local_miq_server
+    @ems = FactoryBot.create(:ems_vmware, :with_unvalidated_authentication, :zone => server.zone)
     @ems_queue_name = "ems_#{@ems.id}"
 
     # General stubbing for testing any worker (methods called during initialize)
@@ -34,12 +34,12 @@ RSpec.describe PerEmsWorkerMixin do
   context ".start_worker_for_ems" do
     it "works when queue name is passed" do
       queue_name = "foo"
-      expect(@worker_class).to receive(:start_worker).with(:queue_name => queue_name)
+      expect(@worker_class).to receive(:start_worker).with({:queue_name => queue_name})
       @worker_class.start_worker_for_ems(queue_name)
     end
 
     it "works when ems is passed" do
-      expect(@worker_class).to receive(:start_worker).with(:queue_name => @ems_queue_name)
+      expect(@worker_class).to receive(:start_worker).with({:queue_name => @ems_queue_name})
       @worker_class.start_worker_for_ems(@ems)
     end
   end

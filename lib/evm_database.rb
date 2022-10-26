@@ -183,8 +183,7 @@ class EvmDatabase
     rails_handler = ManageIQ::PostgresHaAdmin::RailsConfigHandler.new(:file_path => file_path, :environment => Rails.env)
     _log.info("Configuring database failover for #{file_path}'s #{Rails.env} environment")
 
-    rails_handler.before_failover { LinuxAdmin::Service.new("evmserverd").stop }
-    rails_handler.after_failover do
+    rails_handler.after_failover do |new_conn_info|
       # refresh the rails connection info after the config handler changed database.yml
       begin
         ActiveRecord::Base.remove_connection
@@ -194,7 +193,6 @@ class EvmDatabase
       ActiveRecord::Base.establish_connection(Rails.application.config.database_configuration[Rails.env])
 
       raise_server_event("db_failover_executed")
-      LinuxAdmin::Service.new("evmserverd").restart
     end
 
     monitor.add_handler(rails_handler)

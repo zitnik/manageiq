@@ -6,7 +6,7 @@
 #     supports :publish
 #     supports_not :fake, :reason => 'We keep it real'
 #     supports :archive do
-#       unsupported_reason_add(:archive, 'It is too good') if featured?
+#       'It is too good' if featured?
 #     end
 #   end
 #
@@ -72,18 +72,13 @@ module SupportsFeatureMixin
   # query instance for the reason why the feature is unsupported
   def unsupported_reason(feature)
     feature = feature.to_sym
-    public_send("supports_#{feature}?") unless unsupported.key?(feature)
+    supports?(feature) unless unsupported.key?(feature)
     unsupported[feature]
   end
 
   # query the instance if the feature is supported or not
   def supports?(feature)
     public_send("supports_#{feature}?")
-  end
-
-  # query the instance if a feature is generally known
-  def feature_known?(feature)
-    self.class.feature_known?(feature)
   end
 
   private
@@ -125,6 +120,10 @@ module SupportsFeatureMixin
       supported_subclasses.select { |subclass| subclass.supports?(feature) }
     end
 
+    def types_supporting(feature)
+      subclasses_supporting(feature).map(&:name)
+    end
+
     # Provider classes that support this feature
     def provider_classes_supporting(feature)
       subclasses_supporting(feature).map(&:module_parent)
@@ -134,7 +133,7 @@ module SupportsFeatureMixin
     def supporting(feature)
       # First find all instances where the class supports <feature> then select instances
       # which also support <feature> (e.g. the supports block does not add an unsupported_reason)
-      where(:type => subclasses_supporting(feature).map(&:name)).select { |instance| instance.supports?(feature) }
+      where(:type => types_supporting(feature)).select { |instance| instance.supports?(feature) }
     end
 
     # Providers that support this feature
@@ -175,7 +174,12 @@ module SupportsFeatureMixin
           unsupported.delete(feature)
           if block_given?
             begin
-              instance_eval(&block)
+              result = instance_eval(&block)
+              # if no errors yet but result was an error message
+              # then add the error
+              if !unsupported.key?(feature) && result.kind_of?(String)
+                unsupported_reason_add(feature, result)
+              end
             rescue => e
               _log.log_backtrace(e)
               unsupported_reason_add(feature, "Internal Error: #{e.message}")

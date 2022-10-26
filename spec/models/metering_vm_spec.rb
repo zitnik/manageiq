@@ -33,11 +33,10 @@ RSpec.describe MeteringVm do
   let(:ems_cluster) { FactoryBot.create(:ems_cluster, :ext_management_system => ems, :hosts => [host]) }
 
   before do
-    MiqRegion.seed
     ChargebackRateDetailMeasure.seed
     ChargeableField.seed
     MiqEnterprise.seed
-    EvmSpecHelper.create_guid_miq_server_zone
+    EvmSpecHelper.local_miq_server
     Timecop.travel(report_run_time)
   end
 

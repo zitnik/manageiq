@@ -266,6 +266,34 @@ RSpec.describe MiqWidget do
     end
   end
 
+  context "#destroy validation" do
+    let(:widget) { MiqWidget.find_by(:description => "chart_vendor_and_guest_os") }
+    let(:widget_path) { Rails.root.join("product/dashboard/widgets/chart_vendor_and_guest_os.yaml") }
+
+    before do
+      MiqReport.seed_report("Vendor and Guest OS")
+      MiqWidget.sync_from_file(widget_path)
+    end
+
+    it "allows deletion of widgets not in a set/dashboard" do
+      widget.destroy!
+      expect { widget.reload }.to raise_error(ActiveRecord::RecordNotFound)
+    end
+
+    it "prevents deletion of widgets in a set/dashboard" do
+      roles = %w[Default Operator User]
+      sets = roles.collect do |role_name|
+        FactoryBot.create(:miq_widget_set, :name => role_name, :read_only => true, :widget_id => widget.id)
+      end
+      expect { widget.destroy! }.to raise_error(ActiveRecord::RecordNotDestroyed)
+
+      expect(widget.errors.full_messages.first).to include("must be removed from these dashboards")
+      roles.each do |role|
+        expect(widget.errors.full_messages.first).to include(role.to_s)
+      end
+    end
+  end
+
   context "#queue_generate_content" do
     before do
       MiqReport.seed_report("Top CPU Consumers weekly")
@@ -320,33 +348,50 @@ RSpec.describe MiqWidget do
     end
 
     it "skips task creation and records warn message if MiqTask for generating widget content exists and not finished" do
-      MiqTask.create(:name => "Generate Widget: '#{@widget.title}'", :state => "Queued", :status => "Ok", :userid => "system")
+      task = MiqTask.create(:name => "Generate Widget: '#{@widget.title}'", :state => "Queued", :status => "Ok", :userid => "system")
       expect($log).to receive(:warn).with(skip_message(@widget))
-      @widget.queue_generate_content
+
+      task_id = @widget.queue_generate_content
+
+      expect(task_id).to eq(task.id)
     end
 
     it "returns MiqTask id if successful and not records warn message" do
       expect($log).not_to receive(:warn).with(skip_message(@widget))
-      return_value = @widget.queue_generate_content
-      expect(return_value).to equal(MiqTask.where(:name => "Generate Widget: '#{@widget.title}'",
-                                                  :id   => @widget.reload.miq_task_id).first.id)
+
+      task_id = @widget.queue_generate_content
+
+      expect(MiqTask.count).to eq(1)
+      expect(task_id).to eq(MiqTask.first.id)
     end
 
     it "for groups without visibility" do
       expect(@widget).to receive(:queue_generate_content_for_users_or_group).once
-      @widget.queue_generate_content
+
+      task_id = @widget.queue_generate_content
+
+      expect(MiqTask.count).to eq(1)
+      expect(task_id).to eq(MiqTask.first.id)
     end
 
     it "for a group with visibility" do
       @widget.visibility[:roles] << "EvmRole-support"
       expect(@widget).to receive(:queue_generate_content_for_users_or_group).twice
-      @widget.queue_generate_content
+
+      task_id = @widget.queue_generate_content
+
+      expect(MiqTask.count).to eq(1)
+      expect(task_id).to eq(MiqTask.first.id)
     end
 
     it "for all groups with visibility to all" do
       @widget.visibility[:roles] = "_ALL_"
       expect(@widget).to receive(:queue_generate_content_for_users_or_group).twice
-      @widget.queue_generate_content
+
+      task_id = @widget.queue_generate_content
+
+      expect(MiqTask.count).to eq(1)
+      expect(task_id).to eq(MiqTask.first.id)
     end
 
     it "does not generate content if visibility set to group only and there are no users in that group" do
@@ -355,13 +400,19 @@ RSpec.describe MiqWidget do
       @user2.delete
 
       expect(@widget).not_to receive(:queue_generate_content_for_users_or_group)
-      @widget.queue_generate_content
+
+      task_id = @widget.queue_generate_content
+
+      expect(task_id).to be_nil
     end
 
     it "does not generate content if content_type of widget is 'menu'" do
       @widget.update(:content_type => "menu")
       expect(@widget).not_to receive(:queue_generate_content_for_users_or_group)
-      @widget.queue_generate_content
+
+      task_id = @widget.queue_generate_content
+
+      expect(task_id).to be_nil
     end
 
     it "generate content if visibility set to group only with users in that group" do
@@ -369,7 +420,11 @@ RSpec.describe MiqWidget do
       @widget.visibility[:groups] = @group2.description
 
       expect(@widget).to receive(:queue_generate_content_for_users_or_group).once
-      @widget.queue_generate_content
+
+      task_id = @widget.queue_generate_content
+
+      expect(MiqTask.count).to eq(1)
+      expect(task_id).to eq(MiqTask.first.id)
     end
 
     it "creates a new task when previous task is finished" do
@@ -402,7 +457,9 @@ RSpec.describe MiqWidget do
       message.destroy
       expect(MiqQueue.count).to eq(0)
 
-      @widget.queue_generate_content
+      task_id = @widget.queue_generate_content
+      expect(task_id).to_not eq(task.id)
+      expect(task_id).to     eq(MiqTask.last.id)
 
       task.reload
       expect(task.state).to eq(MiqTask::STATE_FINISHED)
@@ -420,7 +477,9 @@ RSpec.describe MiqWidget do
       message.update_attribute(:state, MiqQueue::STATE_ERROR)
       expect(MiqQueue.count).to eq(1)
 
-      @widget.queue_generate_content
+      task_id = @widget.queue_generate_content
+      expect(task_id).to_not eq(task.id)
+      expect(task_id).to     eq(MiqTask.last.id)
 
       task.reload
       expect(task.state).to eq(MiqTask::STATE_FINISHED)
@@ -432,8 +491,7 @@ RSpec.describe MiqWidget do
     it "finished task should not be timed out" do
       @widget.queue_generate_content
       q = MiqQueue.first
-      status, message, result = q.deliver
-      q.delivered(status, message, result)
+      q.deliver_and_process
 
       task = MiqTask.first
       expect(task.status).to eq(MiqTask::STATUS_OK)
@@ -449,8 +507,7 @@ RSpec.describe MiqWidget do
     it "finished task should not be re-used" do
       @widget.queue_generate_content
       q = MiqQueue.first
-      status, message, result = q.deliver
-      q.delivered(status, message, result)
+      q.deliver_and_process
 
       task = MiqTask.first
       expect(task.pct_complete).to eq(100)
@@ -460,8 +517,7 @@ RSpec.describe MiqWidget do
 
       @widget.create_initial_content_for_user(new_user)
       q = MiqQueue.first
-      status, message, result = q.deliver
-      q.delivered(status, message, result)
+      q.deliver_and_process
 
       task.reload
       expect(task.state).to eq(MiqTask::STATE_FINISHED)
@@ -505,7 +561,10 @@ RSpec.describe MiqWidget do
 
       stub_settings(:server  => {:timezone => "Eastern Time (US & Canada)"},
                     :product => {:report_sync => true})
-      @widget.queue_generate_content
+
+      task_id = @widget.queue_generate_content
+      expect(task_id).to be_nil # No task used when report_sync=true
+
       expect(MiqQueue.where(@q_options).count).to eq(0)
     end
 
@@ -650,10 +709,11 @@ RSpec.describe MiqWidget do
 
   context "multiple groups" do
     let(:widget) { MiqWidget.find_by(:description => "chart_vendor_and_guest_os") }
+    let(:widget_path) { Rails.root.join("product/dashboard/widgets/chart_vendor_and_guest_os.yaml") }
 
     before do
       MiqReport.seed_report("Vendor and Guest OS")
-      MiqWidget.seed_widget("chart_vendor_and_guest_os")
+      MiqWidget.sync_from_file(widget_path)
 
       # tests are written for timezone_matters = true
       widget.options[:timezone_matters] = true if widget.options

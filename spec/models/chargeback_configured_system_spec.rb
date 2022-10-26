@@ -38,13 +38,12 @@ RSpec.describe ChargebackConfiguredSystem do
   end
 
   before do
-    MiqRegion.seed
     ChargebackRateDetailMeasure.seed
     ChargeableField.seed
     ManageIQ::Showback::InputMeasure.seed
     MiqEnterprise.seed
 
-    EvmSpecHelper.create_guid_miq_server_zone
+    EvmSpecHelper.local_miq_server
     cat = FactoryBot.create(:classification, :description => "Environment", :name => "environment", :single_value => true, :show => true)
     c = FactoryBot.create(:classification, :name => "prod", :description => "Production", :parent_id => cat.id)
     @tag = c.tag

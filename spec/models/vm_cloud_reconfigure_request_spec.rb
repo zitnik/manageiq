@@ -6,7 +6,7 @@ RSpec.describe VmCloudReconfigureRequest do
   let(:vm_hardware)   { FactoryBot.build(:hardware, :virtual_hw_version => "07") }
   let(:vm_amazon)     { FactoryBot.create(:vm_amazon, :hardware => vm_hardware, :host => host, :ext_management_system => FactoryBot.create(:ext_management_system)) }
 
-  before { _guid, _server, @zone1 = EvmSpecHelper.create_guid_miq_server_zone }
+  before { @zone1 = EvmSpecHelper.local_miq_server.zone }
 
   it("#my_role should be 'ems_operations'") { expect(request.my_role).to eq('ems_operations') }
   it("#vm is present") { expect(request.vm).to eq(vm_amazon) }
@@ -58,7 +58,7 @@ RSpec.describe VmCloudReconfigureRequest do
       expect(request).to                be_valid
       expect(request).to                be_a_kind_of(described_class)
       expect(request.request_type).to   eq("vm_cloud_reconfigure")
-      expect(request.description).to    eq("VM Cloud Reconfigure for: #{vm_amazon.name} - Flavor: ")
+      expect(request.description).to    eq("VM Cloud Reconfigure for: #{vm_amazon.name}")
       expect(request.requester).to      eq(admin)
       expect(request.userid).to         eq(admin.userid)
       expect(request.requester_name).to eq(admin.name)

@@ -652,7 +652,7 @@ RSpec.describe Rbac::Filterer do
         end
 
         it "includes references" do
-          expect(subject).to receive(:include_references).with(anything, ::Vm, nil, :host => {})
+          expect(subject).to receive(:include_references).with(anything, ::Vm, nil, {:host => {}})
                                                          .and_call_original
           expect(subject).to receive(:warn).never
           results
@@ -1216,6 +1216,29 @@ RSpec.describe Rbac::Filterer do
 
       results = described_class.search(:targets => klass).first
       expect(results).to match_array(expected_objects)
+    end
+
+    describe "#rbac_filtered_objects" do
+      # tree 1
+      let(:ems)     { FactoryBot.create(:ems_vmware) }
+      let(:folder)  { FactoryBot.create(:ems_folder, :ext_management_system => ems) }
+      let(:vm)      { FactoryBot.create(:vm_vmware, :ext_management_system => ems).tap { |vm| folder.add_child(vm) } }
+      # tree 2
+      let(:ems2)    { FactoryBot.create(:ems_vmware) }
+      let(:folder2) { FactoryBot.create(:ems_folder, :ext_management_system => ems2) }
+      let(:vm2)     { FactoryBot.create(:vm_vmware, :ext_management_system => ems2).tap { |vm| folder2.add_child(vm) } }
+
+      before do
+        EvmSpecHelper.create_guid_miq_server_zone
+        user.current_group.update(:entitlement => Entitlement.create!(:managed_filters => [[@tags[2]]]))
+      end
+
+      it "properly calls RBAC" do
+        vm.tag_with(@tags[2], :ns => '*')
+        vm2
+
+        expect(Rbac.filtered(EmsFolder, :match_via_descendants => "VmOrTemplate", :user => user)).to eq([folder])
+      end
     end
 
     context "with User and Group" do
@@ -2459,7 +2482,7 @@ RSpec.describe Rbac::Filterer do
     end
 
     it "support aaarm object" do
-      expect(VimPerformanceTrend).to receive(:find).with(:all, :include => {:a => {}}).and_return([:good])
+      expect(VimPerformanceTrend).to receive(:find).with(:all, {:include => {:a => {}}}).and_return([:good])
       expect(described_class.filtered(VimPerformanceTrend, :include_for_find => {:a => {}}).to_a).to match_array([:good])
     end
 

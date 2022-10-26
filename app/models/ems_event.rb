@@ -48,20 +48,20 @@ class EmsEvent < EventStream
   end
 
   def self.add_queue(meth, ems_id, event)
-    if MiqQueue.messaging_type == "miq_queue"
+    if MiqQueue.messaging_client('event_handler').present?
+      MiqQueue.messaging_client('event_handler').publish_topic(
+        :service => "manageiq.#{MiqEventHandler.default_queue_name}",
+        :sender  => ems_id,
+        :event   => event[:event_type],
+        :payload => event
+      )
+    else
       MiqQueue.submit_job(
         :service     => "event",
         :target_id   => ems_id,
         :class_name  => "EmsEvent",
         :method_name => meth,
         :args        => [event]
-      )
-    else
-      MiqQueue.messaging_client('event_handler')&.publish_topic(
-        :service => "manageiq.#{MiqEventHandler.default_queue_name}",
-        :sender  => ems_id,
-        :event   => event[:event_type],
-        :payload => event
       )
     end
   end
@@ -78,6 +78,7 @@ class EmsEvent < EventStream
     process_availability_zone_in_event!(event_hash)
     process_cluster_in_event!(event_hash)
     process_container_entities_in_event!(event_hash)
+    process_physical_storage_in_event!(event_hash)
 
     # Write the event
     new_event = create_event(event_hash)
@@ -134,6 +135,10 @@ class EmsEvent < EventStream
         event[:host_name] ||= host.name
       end
     end
+  end
+
+  def self.process_physical_storage_in_event!(event, options = {})
+    process_object_in_event!(PhysicalStorage, event, options)
   end
 
   def self.process_container_entities_in_event!(event, _options = {})
@@ -300,6 +305,7 @@ class EmsEvent < EventStream
 
   private_class_method def self.syndicate_event(ems_id, event)
     ems = ExtManagementSystem.find(ems_id)
+    event = event.dup
     event[:ems_uid]  = ems&.uid_ems
     event[:ems_type] = ems&.class&.ems_type
 

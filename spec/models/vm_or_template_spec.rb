@@ -350,6 +350,32 @@ RSpec.describe VmOrTemplate do
       @options = {:hdw_attr => :memory_mb}
     end
 
+    context "#advanced_settings" do
+      describe "#paravirtualization" do
+        context "with no advanced_setting" do
+          it "returns nil" do
+            expect(@vm.paravirtualization).to be_nil
+          end
+        end
+
+        context "with vmi.present 'false'" do
+          before { @vm.advanced_settings.create!(:name => "vmi.present", :value => "false") }
+
+          it "returns false" do
+            expect(@vm.paravirtualization).to be_falsey
+          end
+        end
+
+        context "with vmi.present 'true'" do
+          before { @vm.advanced_settings.create!(:name => "vmi.present", :value => "true") }
+
+          it "returns false" do
+            expect(@vm.paravirtualization).to be_truthy
+          end
+        end
+      end
+    end
+
     it "with no drift states" do
       expect(@vm.reconfigured_hardware_value?(@options)).to be_falsey
     end
@@ -1341,7 +1367,7 @@ RSpec.describe VmOrTemplate do
     let(:vm_blue2)       { VmOrTemplate.find_by(:name => "vm_blue2") }
 
     let!(:ems) do
-      _, _, zone = EvmSpecHelper.local_guid_miq_server_zone
+      zone = EvmSpecHelper.local_miq_server.zone
       FactoryBot.create(:ems_vmware, :zone => zone).tap do |ems|
         build_vmware_folder_structure!(ems)
         folder_blue1.add_child(FactoryBot.create(:vm_vmware, :name => "vm_blue1", :ems_id => ems.id))
@@ -1507,6 +1533,27 @@ RSpec.describe VmOrTemplate do
     end
   end
 
+  describe "#product_name" do
+    it "handles no os" do
+      expect(vm.product_name).to be_blank
+    end
+
+    it "uses os" do
+      os = OperatingSystem.create!(:product_name => "test")
+      vm = FactoryBot.create(:vm_or_template, :operating_system => os)
+
+      expect(vm.product_name).to eq(os.product_name)
+    end
+
+    it "uses parent os" do
+      os = OperatingSystem.create!(:product_name => "test")
+      parent = FactoryBot.create(:vm_or_template, :operating_system => os)
+      vm = FactoryBot.create(:vm_or_template, :genealogy_parent => parent)
+
+      expect(vm.product_name).to eq(os.product_name)
+    end
+  end
+
   describe '#normalized_state' do
     let(:klass) { :vm_vmware }
     let(:storage) { FactoryBot.create(:storage_vmware) }
@@ -1538,6 +1585,14 @@ RSpec.describe VmOrTemplate do
       let(:storage) { nil }
 
       include_examples "normalized_state return value", "archived"
+    end
+
+    context 'with no ems and no storage attached' do
+      let(:ems) { nil }
+      let(:storage) { nil }
+      subject { vm }
+
+      it_behaves_like "sql friendly virtual_attribute", :normalized_state, "archived"
     end
 
     context 'no ems attached' do

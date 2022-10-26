@@ -5,7 +5,6 @@ RSpec.describe MiqServer do
 
   context ".seed" do
     before do
-      MiqRegion.seed
       Zone.seed
     end
 
@@ -52,7 +51,7 @@ RSpec.describe MiqServer do
 
   context "instance" do
     before do
-      @guid, @miq_server, @zone = EvmSpecHelper.create_guid_miq_server_zone
+      @miq_server = EvmSpecHelper.local_miq_server
     end
 
     describe "#monitor_myself" do
@@ -79,16 +78,7 @@ RSpec.describe MiqServer do
       end
     end
 
-    it "should have proper guid" do
-      expect(@miq_server.guid).to eq(@guid)
-    end
-
-    it "should have default zone" do
-      expect(@miq_server.zone.name).to eq(@zone.name)
-    end
-
     it "cannot assign to maintenance zone" do
-      MiqRegion.seed
       Zone.seed
 
       @miq_server.zone = Zone.maintenance_zone
@@ -333,8 +323,8 @@ RSpec.describe MiqServer do
 
   describe "#zone_description" do
     it "delegates to zone" do
-      _, miq_server, zone = EvmSpecHelper.create_guid_miq_server_zone
-      expect(miq_server.zone_description).to eq(zone.description)
+      miq_server = EvmSpecHelper.local_miq_server
+      expect(miq_server.zone_description).to eq(miq_server.zone.description)
     end
   end
 
@@ -407,8 +397,6 @@ RSpec.describe MiqServer do
   end
 
   context ".managed_resources" do
-    before { MiqRegion.seed }
-
     let(:ems) { FactoryBot.create(:ems_infra) }
     let!(:active_vm) { FactoryBot.create(:vm_infra, :ext_management_system => ems) }
     let!(:archived_vm) { FactoryBot.create(:vm_infra) }

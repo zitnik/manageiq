@@ -42,11 +42,19 @@ module ManageIQ::Providers
           )
         end
 
+        def placement_groups
+          add_common_default_values
+        end
+
         def cloud_database_flavors
           add_common_default_values
         end
 
         def cloud_databases
+          add_common_default_values
+        end
+
+        def cloud_database_servers
           add_common_default_values
         end
 
@@ -96,8 +104,8 @@ module ManageIQ::Providers
           )
 
           add_dependency_attributes(
-            :orchestration_stacks           => ->(persister) { [persister.collections[:orchestration_stacks]] },
-            :orchestration_stacks_resources => ->(persister) { [persister.collections[:orchestration_stacks_resources]] }
+            :orchestration_stacks           => [persister.collections[:orchestration_stacks]],
+            :orchestration_stacks_resources => [persister.collections[:orchestration_stacks_resources]]
           )
         end
 
@@ -114,8 +122,8 @@ module ManageIQ::Providers
           )
 
           add_dependency_attributes(
-            :vms           => ->(persister) { [persister.collections[:vms]] },
-            :miq_templates => ->(persister) { [persister.collections[:miq_templates]] }
+            :vms           => [persister.collections[:vms]],
+            :miq_templates => [persister.collections[:miq_templates]]
           )
         end
       end

@@ -123,7 +123,7 @@ RSpec.describe Vm do
   context "#invoke_tasks_local" do
     before do
       Zone.seed
-      EvmSpecHelper.create_guid_miq_server_zone
+      EvmSpecHelper.local_miq_server
 
       @host = FactoryBot.create(:host)
       @vm = FactoryBot.create(:vm_vmware, :host => @host)
@@ -169,7 +169,7 @@ RSpec.describe Vm do
 
   context "#start" do
     before do
-      EvmSpecHelper.create_guid_miq_server_zone
+      EvmSpecHelper.local_miq_server
       @host = FactoryBot.create(:host_vmware)
       @vm = FactoryBot.create(:vm_vmware,
                                :host      => @host,
@@ -185,8 +185,7 @@ RSpec.describe Vm do
 
       allow(MiqAeEngine).to receive_messages(:deliver => ['ok', 'sucess', MiqAeEngine::MiqAeWorkspaceRuntime.new])
       @vm.start
-      status, message, result = MiqQueue.first.deliver
-      MiqQueue.first.delivered(status, message, result)
+      MiqQueue.first.deliver_and_process
     end
 
     it "policy prevented" do
@@ -203,7 +202,7 @@ RSpec.describe Vm do
 
   context "#scan" do
     before do
-      EvmSpecHelper.create_guid_miq_server_zone
+      EvmSpecHelper.local_miq_server
       @host = FactoryBot.create(:host_vmware)
       @vm = FactoryBot.create(
         :vm_vmware,
@@ -220,8 +219,7 @@ RSpec.describe Vm do
 
       allow(MiqAeEngine).to receive_messages(:deliver => ['ok', 'sucess', MiqAeEngine::MiqAeWorkspaceRuntime.new])
       @vm.scan
-      status, message, result = MiqQueue.first.deliver
-      MiqQueue.first.delivered(status, message, result)
+      MiqQueue.first.deliver_and_process
     end
 
     it "policy prevented" do

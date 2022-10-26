@@ -14,6 +14,7 @@ RSpec.describe GenericObjectDefinition do
       }
     )
   end
+  let(:objects) { FactoryBot.create_list(:generic_object, 2, :generic_object_definition => definition) }
 
   it "doesn't access database when unchanged model is saved" do
     m = FactoryBot.create(:generic_object_definition)
@@ -393,6 +394,12 @@ RSpec.describe GenericObjectDefinition do
         expect(definition.custom_actions).to match(expected)
       end
     end
+  end
+
+  describe '#generic_objects_count' do
+    before  { objects }
+    subject { definition }
+    it_behaves_like "sql friendly virtual_attribute", :generic_objects_count, 2
   end
 
   shared_examples 'AR attribute allowing letters' do |hash|

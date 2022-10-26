@@ -121,7 +121,7 @@ RSpec.describe EmsEvent do
       end
 
       context "messaging_type: artemis" do
-        before { stub_settings_merge(:prototype => {:messaging_type => 'artemis'}) }
+        before { stub_settings_merge(:messaging_type => 'artemis') }
 
         it "Adds event to Artemis queue" do
           messaging_client = double("ManageIQ::Messaging")
@@ -134,14 +134,14 @@ RSpec.describe EmsEvent do
           }
 
           expect(messaging_client).to receive(:publish_topic).with(expected_queue_payload)
-          expect(MiqQueue).to receive(:messaging_client).with('event_handler').and_return(messaging_client)
+          expect(MiqQueue).to receive(:messaging_client).with('event_handler').and_return(messaging_client).twice
 
           described_class.add_queue('add', ems.id, event_hash)
         end
       end
 
       context "messaging_type: kafka" do
-        before { stub_settings_merge(:prototype => {:messaging_type => 'kafka'}) }
+        before { stub_settings_merge(:messaging_type => 'kafka') }
 
         it "Adds event to Kafka topic" do
           messaging_client = double("ManageIQ::Messaging")
@@ -154,14 +154,14 @@ RSpec.describe EmsEvent do
           }
 
           expect(messaging_client).to receive(:publish_topic).with(expected_queue_payload)
-          expect(MiqQueue).to receive(:messaging_client).with('event_handler').and_return(messaging_client)
+          expect(MiqQueue).to receive(:messaging_client).with('event_handler').and_return(messaging_client).twice
 
           described_class.add_queue('add', ems.id, event_hash)
         end
       end
 
       context "messaging_type: miq_queue" do
-        before { stub_settings_merge(:prototype => {:messaging_type => 'miq_queue'}) }
+        before { stub_settings_merge(:messaging_type => 'miq_queue') }
 
         it "Adds event to MiqQueue" do
           expected_queue_payload = {
@@ -517,6 +517,27 @@ RSpec.describe EmsEvent do
         expect(EmsRefresh).to receive(:queue_refresh).with(ems, any_args)
         ems_event.manager_refresh
       end
+    end
+  end
+
+  context 'Physical Storage Events' do
+    let(:ems)   { FactoryBot.create(:ems_storage) }
+    let(:physical_storage) { FactoryBot.create(:physical_storage, :name => "my-storage", :ems_ref => "ems1", :ext_management_system => ems) }
+    let(:event_hash) {
+      {
+        :event_type               => "physical_storage_alert",
+        :ems_ref                  => "1",
+        :physical_storage_ems_ref => physical_storage.ems_ref,
+        :ems_id                   => ems.id,
+        :message                  => "description"
+      }
+    }
+
+    it "test process_physical_storage_in_event!" do
+      event = EmsEvent.add(ems.id, event_hash)
+      expect(event.attributes.keys).to include('physical_storage_id', 'physical_storage_name')
+      expect(event.physical_storage_id).to eq(physical_storage.id)
+      expect(event.physical_storage_name).to eq(physical_storage.name)
     end
   end
 end

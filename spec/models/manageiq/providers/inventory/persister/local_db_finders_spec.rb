@@ -114,7 +114,7 @@ RSpec.describe ManageIQ::Providers::Inventory::Persister do
           ]
         )
       )
-      network2 = persister.networks.find(:hardware => lazy_find_hardware2, :description => "public")
+      network2 = persister.networks.find({:hardware => lazy_find_hardware2, :description => "public"})
       expect(persister.networks.index_proxy.send(:local_db_indexes)[:manager_ref].send(:index).keys).to(
         match_array(
           [
@@ -123,7 +123,7 @@ RSpec.describe ManageIQ::Providers::Inventory::Persister do
           ]
         )
       )
-      network60 = persister.networks.find(:hardware => lazy_find_hardware60, :description => "public")
+      network60 = persister.networks.find({:hardware => lazy_find_hardware60, :description => "public"})
       expect(persister.networks.index_proxy.send(:local_db_indexes)[:manager_ref].send(:index).keys).to(
         match_array(
           [
@@ -258,7 +258,7 @@ RSpec.describe ManageIQ::Providers::Inventory::Persister do
           :stack   => lazy_find_stack_1_11,
           :ems_ref => orchestration_stack_resource_data("1_11_1")[:ems_ref]
         },
-        {:ref => :by_stack_and_ems_ref}
+        :ref => :by_stack_and_ems_ref
       )
 
       # Assert all references are one by one
@@ -345,7 +345,7 @@ RSpec.describe ManageIQ::Providers::Inventory::Persister do
         )
       )
 
-      vm1 = persister.vms.find({:name => vm_data(1)[:name]}, {:ref => :by_name})
+      vm1 = persister.vms.find({:name => vm_data(1)[:name]}, :ref => :by_name)
       expect(vm1[:ems_ref]).to eq "vm_ems_ref_1"
 
       expect(persister.vms.index_proxy.send(:local_db_indexes)[:by_name].send(:index).keys).to(
@@ -369,7 +369,7 @@ RSpec.describe ManageIQ::Providers::Inventory::Persister do
         )
       )
 
-      vm1 = persister.vms.find({:uid_ems => vm_data(1)[:uid_ems], :name => vm_data(1)[:name]}, {:ref => :by_uid_ems_and_name})
+      vm1 = persister.vms.find({:uid_ems => vm_data(1)[:uid_ems], :name => vm_data(1)[:name]}, :ref => :by_uid_ems_and_name)
       expect(vm1[:ems_ref]).to eq "vm_ems_ref_1"
 
       expect(persister.vms.index_proxy.send(:local_db_indexes)[:by_uid_ems_and_name].send(:index).keys).to(
@@ -402,7 +402,7 @@ RSpec.describe ManageIQ::Providers::Inventory::Persister do
     it "checks primary index attributes exist" do
       expect do
         persister.add_collection(persister.send(:cloud), :vms, {:manager_ref => %i[ems_ref ems_gref]}, {:without_sti => true})
-      end.to raise_error("Invalid definition of index :manager_ref, there is no attribute :ems_gref on model Vm")
+      end.to raise_error(/Invalid definition of index :manager_ref, there is no attribute :ems_gref on model/)
     end
 
     it "checks secondary index attributes exist" do
@@ -413,13 +413,15 @@ RSpec.describe ManageIQ::Providers::Inventory::Persister do
           {:secondary_refs => {:by_uid_ems_and_name => %i[uid_emsa name]}},
           {:without_sti => true}
         )
-      end.to raise_error("Invalid definition of index :by_uid_ems_and_name, there is no attribute :uid_emsa on model Vm")
+      end.to raise_error(/Invalid definition of index :by_uid_ems_and_name, there is no attribute :uid_emsa on model/)
     end
 
     it "checks relation is allowed in index" do
       persister.add_collection(persister.send(:cloud), :vms) do |builder|
-        builder.add_properties(:model_class    => ::ManageIQ::Providers::CloudManager::Vm,
-                               :secondary_refs => {:by_availability_zone_and_name => %i(availability_zone name)})
+        builder.add_properties(
+          :model_class    => ::ManageIQ::Providers::CloudManager::Vm,
+          :secondary_refs => {:by_availability_zone_and_name => %i[availability_zone name]}
+        )
       end
 
       expect(persister.vms.index_proxy.send(:data_indexes).keys).to match_array(%i(manager_ref by_availability_zone_and_name))
@@ -428,9 +430,9 @@ RSpec.describe ManageIQ::Providers::Inventory::Persister do
     it "checks relation is on model class" do
       expect do
         persister.add_collection(persister.send(:cloud), :vms, {}, {:without_sti => true}) do |builder|
-          builder.add_properties(:secondary_refs => {:by_availability_zone_and_name => %i(availability_zone name)})
+          builder.add_properties(:secondary_refs => {:by_lan_and_name => %i[lan name]})
         end
-      end.to raise_error("Invalid definition of index :by_availability_zone_and_name, there is no attribute :availability_zone on model Vm")
+      end.to raise_error(/Invalid definition of index :by_lan_and_name, there is no attribute :lan on model/)
     end
 
     it "checks we allow any index attributes when we use custom_saving block" do

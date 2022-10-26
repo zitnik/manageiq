@@ -2,7 +2,6 @@ class CloudVolume < ApplicationRecord
   include NewWithTypeStiMixin
   include ProviderObjectMixin
   include AsyncDeleteMixin
-  include AvailabilityMixin
   include SupportsFeatureMixin
   include CloudTenancyMixin
   include CustomActionsMixin
@@ -32,6 +31,7 @@ class CloudVolume < ApplicationRecord
   supports_not :update
   supports_not :attach
   supports_not :detach
+  supports_not :clone
 
   delegate :queue_name_for_ems_operations, :to => :ext_management_system, :allow_nil => true
 
@@ -192,6 +192,7 @@ class CloudVolume < ApplicationRecord
     raise NotImplementedError, _("available_vms must be implemented in a subclass")
   end
 
+  # TODO(kbrock): remove when this is moved from ui-classic to manageiq-api
   def create_volume_snapshot_queue(userid, options = {})
     ext_management_system.class_by_ems(:CloudVolumeSnapshot)&.create_snapshot_queue(userid, self, options)
   end

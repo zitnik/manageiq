@@ -18,19 +18,24 @@ module ManageIQ
 
       setup_gemfile_lock if ENV["CI"]
       install_bundler(plugin_root)
+      bundle_config(plugin_root)
       bundle_update(plugin_root, force: force_bundle_update)
 
       ensure_config_files
+
+      unless ENV["CI"]
+        migrate_database
+        seed_database
+      end
 
       setup_test_environment(:task_prefix => 'app:', :root => plugin_root) unless ENV["SKIP_TEST_RESET"]
     end
 
     def self.ensure_config_files
       config_files = {
-        "certs/v2_key.dev"           => "certs/v2_key",
-        "config/cable.yml.sample"    => "config/cable.yml",
-        "config/database.pg.yml"     => "config/database.yml",
-        "config/messaging.kafka.yml" => "config/messaging.yml",
+        "certs/v2_key.dev"        => "certs/v2_key",
+        "config/cable.yml.sample" => "config/cable.yml",
+        "config/database.pg.yml"  => "config/database.yml"
       }
 
       config_files.each do |source, dest|
@@ -73,6 +78,10 @@ module ManageIQ
 
       raise "Missing Gemfile.lock.release" unless APP_ROOT.join("Gemfile.lock.release").file?
       FileUtils.cp(APP_ROOT.join("Gemfile.lock.release"), APP_ROOT.join("Gemfile.lock"))
+    end
+
+    def self.bundle_config(root = APP_ROOT)
+      system!("bundle config set --local build.rugged --with-ssh", :chdir => root)
     end
 
     def self.bundle_update(root = APP_ROOT, force: false)

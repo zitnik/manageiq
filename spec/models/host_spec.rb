@@ -1,5 +1,10 @@
 RSpec.describe Host do
+  include Spec::Support::ArelHelper
+  include Spec::Support::SupportsHelper
+
   subject { FactoryBot.create(:host) }
+
+  let(:ems) { FactoryBot.create(:ext_management_system) }
 
   include_examples "AggregationMixin"
   include_examples "MiqPolicyMixin"
@@ -120,18 +125,17 @@ RSpec.describe Host do
   end
 
   context "power operations" do
-    let(:validation_response) { {:available => false, :message => "The Host is not VMware ESX"} }
-
+    let(:power_state) { "off" }
     before do
-      EvmSpecHelper.create_guid_miq_server_zone
+      EvmSpecHelper.local_miq_server
       @ems = FactoryBot.create(:ext_management_system, :tenant => FactoryBot.create(:tenant))
-      @host = FactoryBot.create(:host, :ems_id => @ems.id)
+      @host = FactoryBot.create(:host, :ems_id => @ems.id, :power_state => power_state)
     end
 
     context "#start" do
       before do
-        allow_any_instance_of(described_class).to receive_messages(:validate_start   => {})
-        allow_any_instance_of(described_class).to receive_messages(:validate_ipmi    => {:available => true, :message => nil})
+        stub_supports_all_others(described_class)
+        stub_supports(described_class, :ipmi)
         allow_any_instance_of(described_class).to receive_messages(:run_ipmi_command => "off")
         FactoryBot.create(:miq_event_definition, :name => :request_host_start)
         # admin user is needed to process Events
@@ -143,8 +147,7 @@ RSpec.describe Host do
 
         MiqQueue.delete_all
         @host.start
-        status, message, result = MiqQueue.first.deliver
-        MiqQueue.first.delivered(status, message, result)
+        MiqQueue.first.deliver_and_process
       end
 
       it "policy prevented" do
@@ -159,28 +162,28 @@ RSpec.describe Host do
     end
 
     context "with shutdown invalid" do
-      it("#shutdown")          { expect { @host.shutdown }.not_to raise_error }
-      it("#validate_shutdown") { expect(@host.validate_shutdown).to eq(validation_response) }
+      it("#shutdown")           { expect { @host.shutdown }.not_to raise_error }
+      it("#supports_shutdown?") { expect(@host.supports?(:shutdown)).to be_falsey }
     end
 
     context "with reboot invalid" do
-      it("#reboot")          { expect { @host.reboot }.not_to raise_error }
-      it("#validate_reboot") { expect(@host.validate_reboot).to eq(validation_response) }
+      it("#reboot")           { expect { @host.reboot }.not_to raise_error }
+      it("#supports_reboot?") { expect(@host.supports?(:reboot)).to be_falsey }
     end
 
     context "with standby invalid" do
-      it("#standby")          { expect { @host.standby }.not_to raise_error }
-      it("#validate_standby") { expect(@host.validate_standby).to eq(validation_response) }
+      it("#standby")            { expect { @host.standby }.not_to raise_error }
+      it("#supports_shutdown?") { expect(@host.supports?(:shutdown)).to be_falsey }
     end
 
     context "with enter_maint_mode invalid" do
-      it("#enter_maint_mode")          { expect { @host.enter_maint_mode }.not_to raise_error }
-      it("#validate_enter_maint_mode") { expect(@host.validate_enter_maint_mode).to eq(validation_response) }
+      it("#enter_maint_mode")           { expect { @host.enter_maint_mode }.not_to raise_error }
+      it("#supports_enter_maint_mode?") { expect(@host.supports?(:enter_maint_mode)).to be_falsey }
     end
 
     context "with exit_maint_mode invalid" do
       it("#exit_maint_mode")          { expect { @host.exit_maint_mode }.not_to raise_error }
-      it("#validate_exit_maint_mode") { expect(@host.validate_exit_maint_mode).to eq(validation_response) }
+      it("#supports_exit_maint_mode") { expect(@host.supports?(:exit_maint_mode)).to be_falsey }
     end
   end
 
@@ -473,64 +476,40 @@ RSpec.describe Host do
     end
   end
 
-  describe "#validate_power_state" do
-    let(:host) do
-      FactoryBot.create(:host_vmware_esx,
-                         :ext_management_system => FactoryBot.create(:ems_vmware),
-                         :vmm_vendor            => 'vmware')
-    end
-
-    context "when host power state equal to pstate" do
-      it "returns nil" do
-        expect(host.validate_power_state('on')).to be_nil
-        expect(host.validate_power_state(['on'])).to be_nil
-      end
-    end
-
-    context "when host power state does not equal to pstate" do
-      it "returns available false" do
-        expect(host.validate_power_state('off')).to eq(:available => false,
-                                                       :message   => "The Host is not powered 'off'")
-        expect(host.validate_power_state(['off'])).to eq(:available => false,
-                                                         :message   => "The Host is not powered [\"off\"]")
-      end
-    end
-  end
-
   context "vmotion validation methods" do
     let(:host) do
       FactoryBot.create(:host_vmware_esx,
-                         :ext_management_system => FactoryBot.create(:ems_vmware),
-                         :vmm_vendor            => 'vmware')
+                        :ext_management_system => FactoryBot.create(:ems_vmware),
+                        :vmm_vendor            => 'vmware')
     end
 
     describe "#validate_enable_vmotion" do
       it "returns available true" do
-        expect(host.validate_enable_vmotion).to eq(:available => true, :message => nil)
+        expect(host.supports?(:enable_vmotion)).to be_truthy
       end
     end
 
     describe "#validate_disable_vmotion" do
       it "returns available true" do
-        expect(host.validate_disable_vmotion).to eq(:available => true, :message => nil)
+        expect(host.supports?(:disable_vmotion)).to be_truthy
       end
     end
 
     describe "#validate_vmotion_enabled?" do
       it "returns available true" do
-        expect(host.validate_vmotion_enabled?).to eq(:available => true, :message => nil)
+        expect(host.supports?(:vmotion_enabled)).to be_truthy
       end
     end
   end
 
-  describe "#validate_ipmi" do
-    subject { host.validate_ipmi }
+  describe "#supports (validate_ipmi portion)" do
+    subject { host.unsupported_reason(:reset) }
 
     context "host does not have ipmi address" do
       let(:host) { FactoryBot.create(:host) }
 
       it "returns available false" do
-        expect(subject).to eq(:available => false, :message => "The Host is not configured for IPMI")
+        expect(subject).to eq("The Host is not configured for IPMI")
       end
     end
 
@@ -542,23 +521,69 @@ RSpec.describe Host do
 
       context "host does not have ipmi credentials" do
         it "returns available false" do
-          expect(subject).to eq(:available => false, :message => "The Host has no IPMI credentials")
+          expect(subject).to eq("The Host has no IPMI credentials")
         end
       end
 
       context "host has incorrect ipmi credentials" do
         it "returns available false" do
           host.update_authentication(:ipmi => {:password => "a"})
-          expect(subject).to eq(:available => false, :message => "The Host has invalid IPMI credentials")
+          expect(subject).to eq("The Host has invalid IPMI credentials")
         end
       end
 
       context "host has correct ipmi credentials" do
         it "returns available true" do
           host.update_authentication(:ipmi => {:userid => "a", :password => "a"})
-          expect(subject).to eq(:available => true, :message => nil)
+          expect(subject).to be_nil
         end
       end
+    end
+  end
+
+  describe "#normalized_state" do
+    it "returns archived" do
+      host = FactoryBot.build(:host)
+      expect(host.normalized_state).to eq("archived")
+    end
+
+    it "returns unknown" do
+      host = FactoryBot.build(:host, :power_state => nil, :ext_management_system => ems)
+      expect(host.normalized_state).to eq("unknown")
+    end
+
+    it "returns power_state" do
+      host = FactoryBot.build(:host, :power_state => "on", :ext_management_system => ems)
+      expect(host.normalized_state).to eq("on")
+    end
+  end
+
+  describe "#archived" do
+    it "works in sql true" do
+      FactoryBot.create(:host)
+      expect(virtual_column_sql_value(Host, "archived")).to eq(true)
+    end
+
+    it "works in sql false" do
+      FactoryBot.create(:host, :ext_management_system => ems)
+      expect(virtual_column_sql_value(Host, "archived")).to eq(false)
+    end
+
+    it "works in ruby true" do
+      expect(Host.new.archived).to be true
+    end
+
+    it "works in ruby false" do
+      expect(FactoryBot.create(:host, :ext_management_system => ems).archived).to be false
+    end
+  end
+
+  describe ".archived" do
+    it "only returns archived" do
+      host = FactoryBot.create(:host)
+      FactoryBot.create(:host, :ext_management_system => ems)
+
+      expect(Host.archived).to eq([host])
     end
   end
 
@@ -572,13 +597,13 @@ RSpec.describe Host do
       let(:host_off) { FactoryBot.create(:host_with_ipmi, :power_state => 'off') }
 
       it "returns available true" do
-        expect(host_off.validate_start).to eq(:available => true, :message => nil)
+        expect(host_off.supports?(:start)).to be_truthy
       end
     end
 
     describe "#validate_stop" do
       it "returns available true" do
-        expect(host_with_ipmi.validate_stop).to eq(:available => true, :message => nil)
+        expect(host_with_ipmi.supports?(:stop)).to be_truthy
       end
     end
 
@@ -615,7 +640,7 @@ RSpec.describe Host do
 
   describe "#scan" do
     before do
-      EvmSpecHelper.create_guid_miq_server_zone
+      EvmSpecHelper.local_miq_server
       @host = FactoryBot.create(:host_vmware)
       FactoryBot.create(:miq_event_definition, :name => :request_host_scan)
       # admin user is needed to process Events
@@ -647,7 +672,6 @@ RSpec.describe Host do
     let(:host) { FactoryBot.create(:host_vmware, :ext_management_system => ems) }
 
     before do
-      MiqRegion.seed
       Zone.seed
     end
 

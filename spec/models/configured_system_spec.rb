@@ -1,4 +1,6 @@
 RSpec.describe ConfiguredSystem do
+  include Spec::Support::ArelHelper
+
   it "#counterparts" do
     vm  = FactoryBot.create(:vm)
     cs1 = FactoryBot.create(:configured_system, :counterpart => vm)
@@ -6,6 +8,16 @@ RSpec.describe ConfiguredSystem do
     cs3 = FactoryBot.create(:configured_system, :counterpart => vm)
 
     expect(cs1.counterparts).to match_array([vm, cs2, cs3])
+  end
+
+  describe "#inventory_root_group_name" do
+    context "with no inventory root group" do
+      subject { FactoryBot.create(:configured_system) }
+      it_behaves_like "sql friendly virtual_attribute", :inventory_root_group_name, nil
+    end
+
+    subject { FactoryBot.create(:configured_system, :inventory_root_group => FactoryBot.create(:ems_folder, :name => 'folder_name')) }
+    it_behaves_like "sql friendly virtual_attribute", :inventory_root_group_name, 'folder_name'
   end
 
   describe "#queue_name_for_ems_operations" do

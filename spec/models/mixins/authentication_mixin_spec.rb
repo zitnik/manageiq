@@ -1,5 +1,6 @@
 RSpec.describe AuthenticationMixin do
   include Spec::Support::ArelHelper
+  include Spec::Support::SupportsHelper
 
   let(:host)            { FactoryBot.create(:host) }
   let(:invalid_auth)    { FactoryBot.create(:authentication, :resource => host, :status => "Invalid") }
@@ -215,7 +216,7 @@ RSpec.describe AuthenticationMixin do
               Host.authentication_check_schedule
               allow_any_instance_of(Host).to receive(:verify_credentials).and_raise
               msg = MiqQueue.find_by(queue_conditions)
-              msg.delivered(*msg.deliver)
+              msg.deliver_and_process
 
               # attempt 2, 3, 4, 5 should requeue, 6 should NOT
               2.upto(6) do |counter|
@@ -225,7 +226,7 @@ RSpec.describe AuthenticationMixin do
                   expect(msg.args.last).to eq(:attempt => counter)
                   expect(msg.deliver_on).to be_within(0.01).of(time + minutes)
 
-                  msg.delivered(*msg.deliver)
+                  msg.deliver_and_process
                 else
                   expect(MiqQueue).not_to exist(queue_conditions)
                 end
@@ -732,7 +733,7 @@ RSpec.describe AuthenticationMixin do
         context "#change_password" do
           it "should fail if some param is blank" do
             current_password = ""
-            allow(@ems).to receive(:supports?).with(:change_password) { true }
+            stub_supports(@ems.class, :change_password)
 
             expect { @ems.change_password(current_password, new_password, confirm_password) }
               .to raise_error(MiqException::Error, "Please, fill the current_password and new_password fields.")
@@ -745,7 +746,7 @@ RSpec.describe AuthenticationMixin do
 
           it "should update the provider password" do
             allow(@ems).to receive(:raw_change_password) { true }
-            allow(@ems).to receive(:supports?).with(:change_password) { true }
+            stub_supports(@ems.class, :change_password)
 
             expect(@ems.change_password(current_password, new_password, confirm_password)).to be_truthy
           end

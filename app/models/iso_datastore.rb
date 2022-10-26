@@ -2,11 +2,7 @@ class IsoDatastore < ApplicationRecord
   belongs_to :ext_management_system, :foreign_key => :ems_id, :inverse_of => :iso_datastore
   has_many   :iso_images, :dependent => :destroy
 
-  virtual_column :name, :type => :string, :uses => :ext_management_system
-
-  def name
-    ext_management_system.try(:name)
-  end
+  virtual_delegate :name, :to => :ext_management_system, :allow_nil => true, :type => :string
 
   # Synchronize advertised images as a queued task. The
   # queue name and the queue zone are derived from the EMS.
@@ -23,7 +19,7 @@ class IsoDatastore < ApplicationRecord
   end
 
   def advertised_images
-    return [] unless ext_management_system.kind_of?(ManageIQ::Providers::Redhat::InfraManager)
+    return [] unless ext_management_system.kind_of?(ManageIQ::Providers::Ovirt::InfraManager)
 
     ext_management_system.ovirt_services.advertised_images
   end
@@ -48,7 +44,7 @@ class IsoDatastore < ApplicationRecord
     update_attribute(:last_refresh_on, Time.now.utc)
 
     _log.info("Synchronizing images on #{log_for}...Complete")
-  rescue ManageIQ::Providers::Redhat::InfraManager::OvirtServices::Error
+  rescue ManageIQ::Providers::Ovirt::InfraManager::OvirtServices::Error
   end
 
   def self.display_name(number = 1)

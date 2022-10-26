@@ -4,7 +4,6 @@ module ManageIQ::Providers
     require_nested :MetricsCapture
     require_nested :OrchestrationStack
 
-    include AvailabilityMixin
     include HasMonitoringManagerMixin
     include HasInfraManagerMixin
     include SupportsFeatureMixin
@@ -57,13 +56,10 @@ module ManageIQ::Providers
 
     virtual_column :port_show, :type => :string
 
-    supports :external_logging do
-      unless respond_to?(:external_logging_route_name)
-        unsupported_reason_add(:external_logging, _('This provider type does not support external_logging'))
-      end
-    end
-
-    supports :metrics
+    supports     :authentication_status
+    supports_not :external_logging
+    supports     :metrics
+    supports     :performance
 
     class << model_name
       define_method(:route_key) { "ems_containers" }
@@ -73,18 +69,6 @@ module ManageIQ::Providers
     # enables overide of ChartsLayoutService#find_chart_path
     def chart_layout_path
       "ManageIQ_Providers_ContainerManager"
-    end
-
-    def validate_performance
-      {:available => true, :message => nil}
-    end
-
-    def validate_ad_hoc_metrics
-      {:available => true, :message => nil}
-    end
-
-    def validate_authentication_status
-      {:available => true, :message => nil}
     end
 
     def port_show

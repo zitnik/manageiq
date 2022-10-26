@@ -195,7 +195,7 @@ module Ansible
 
         validate_params!(env_vars, extra_vars, tags, ansible_runner_method, playbook_or_role_args)
 
-        base_dir = Dir.mktmpdir("ansible-runner")
+        base_dir = Pathname.new(Dir.mktmpdir("ansible-runner"))
         debug    = verbosity.to_i >= 5 || env_vars["ANSIBLE_KEEP_REMOTE_FILES"]
 
         cred_command_line, cred_env_vars, cred_extra_vars = credentials_info(credentials, base_dir)
@@ -218,9 +218,11 @@ module Ansible
         begin
           fetch_galaxy_roles(playbook_or_role_args)
 
-          result = wait_for(pid_file(base_dir)) do
-            AwesomeSpawn.run("ansible-runner", :env => env_vars_hash, :params => params)
-          end
+          result = if async?(ansible_runner_method)
+                     wait_for(base_dir, "pid") { AwesomeSpawn.run("ansible-runner", :env => env_vars_hash, :params => params) }
+                   else
+                     AwesomeSpawn.run("ansible-runner", :env => env_vars_hash, :params => params)
+                   end
 
           res = response(base_dir, ansible_runner_method, result, debug)
         ensure
@@ -306,10 +308,7 @@ module Ansible
       end
 
       def runner_env
-        {
-          "ANSIBLE_STDOUT_CALLBACK" => "json",
-          "PYTHONPATH"              => python_path
-        }.delete_nils
+        {"PYTHONPATH" => python_path}.delete_nils
       end
 
       def credentials_info(credentials, base_dir)
@@ -357,18 +356,14 @@ module Ansible
         FileUtils.mkdir_p(File.join(base_dir, "env")).first
       end
 
-      def pid_file(base_dir)
-        File.join(base_dir, "pid")
-      end
-
-      def wait_for(path, timeout: 10.seconds)
+      def wait_for(base_dir, target_path, timeout: 10.seconds)
         require "listen"
         require "concurrent"
 
         path_created = Concurrent::Event.new
 
-        listener = Listen.to(File.dirname(path), :only => %r{\A#{File.basename(path)}\z}) do |modified, added, _removed|
-          path_created.set if added.include?(path) || modified.include?(path)
+        listener = Listen.to(base_dir, :only => %r{\A#{target_path}\z}) do |modified, added, _removed|
+          path_created.set if added.include?(base_dir.join(target_path).to_s) || modified.include?(base_dir.join(target_path).to_s)
         end
 
         thread = Thread.new do
@@ -383,7 +378,7 @@ module Ansible
 
         begin
           res = yield
-          raise "Timed out waiting for #{path}" unless path_created.wait(timeout)
+          raise "Timed out waiting for #{target_path}" unless path_created.wait(timeout)
         ensure
           listener.stop
           thread.join
@@ -410,13 +405,21 @@ module Ansible
       end
 
       PYTHON3_MODULE_PATHS = %w[
-        /usr/lib64/python3.6/site-packages
         /var/lib/awx/venv/ansible/lib/python3.6/site-packages
         /var/lib/manageiq/venv/lib/python3.6/site-packages
+        /var/lib/manageiq/venv/lib/python3.8/site-packages
       ].freeze
       def python3_modules_path
         @python3_modules_path ||= begin
-          determine_existing_python_paths_for(*PYTHON3_MODULE_PATHS).join(File::PATH_SEPARATOR)
+          paths = [ansible_python_path.presence, *PYTHON3_MODULE_PATHS].compact
+          determine_existing_python_paths_for(*paths).join(File::PATH_SEPARATOR)
+        end
+      end
+
+      def ansible_python_path
+        @ansible_python_path ||= begin
+          path = `ansible --version 2>/dev/null`.split("\n").grep(/ansible python module location/).first.to_s.split(" = ").last.to_s
+          path.present? ? File.dirname(path) : path
         end
       end
 

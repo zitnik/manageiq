@@ -24,15 +24,12 @@ task :release do
   lock_release = root.join("Gemfile.lock.release")
   if lock_release.exist?
     gemfile_lock = lock_release.to_s.chomp(".release")
-    appliance_dependency = root.join("bundler.d/manageiq-appliance-dependencies.rb")
 
     FileUtils.ln_s(lock_release, gemfile_lock, :force => true)
-    FileUtils.ln_s(root.join("../manageiq-appliance/manageiq-appliance-dependencies.rb"),
-                   appliance_dependency, :force => true)
 
     exit $?.exitstatus unless Bundler.unbundled_system({"BUNDLE_IGNORE_CONFIG" => "true", "APPLIANCE" => "true"}, "bundle lock --update --conservative --patch")
 
-    FileUtils.rm([appliance_dependency, gemfile_lock])
+    FileUtils.rm(gemfile_lock)
 
     lock_content = lock_release.read
     lock_release.write(lock_content.gsub("branch: #{branch}", "tag: #{version}"))
@@ -201,17 +198,25 @@ namespace :release do
     end
 
     begin
-      require "open-uri"
-      appliance_deps = URI.parse("https://raw.githubusercontent.com/ManageIQ/manageiq-appliance/#{branch}/manageiq-appliance-dependencies.rb").read
-      appliance_deps_file = local_bundler_d.join("manageiq_appliance_dependencies.rb")
-      File.write(appliance_deps_file, appliance_deps)
-
-      FileUtils.cp(root.join("Gemfile.lock.release"), root.join("Gemfile.lock"))
+      if root.join("Gemfile.lock.release").exist?
+        FileUtils.cp(root.join("Gemfile.lock.release"), root.join("Gemfile.lock"))
+      else
+        # First time build of Gemfile.lock.release
+        update_gems = ["*"]
+        root.join("Gemfile.lock").delete
+      end
 
       if update_gems.any?
+        cmd =
+          if update_gems == ["*"]
+            "bundle update" # Update everything regardless of patch level
+          else
+            "bundle update --conservative --patch #{update_gems.join(" ")}"
+          end
+
         Bundler.with_unbundled_env do
           puts "** Updating gems #{update_gems.join(", ")}"
-          exit $?.exitstatus unless system({"APPLIANCE" => "true"}, "bundle update --conservative --patch #{update_gems.join(" ")}", :chdir => root)
+          exit $?.exitstatus unless system({"APPLIANCE" => "true"}, cmd, :chdir => root)
         end
       end
 
@@ -219,6 +224,7 @@ namespace :release do
         ruby
         x86_64-linux
         x86_64-darwin
+        x86_64-darwin-21
         powerpc64le-linux
       ].sort_by { |p| [RUBY_PLATFORM.start_with?(p) ? 0 : 1, p] }
 
@@ -230,8 +236,6 @@ namespace :release do
       end
 
       FileUtils.cp(root.join("Gemfile.lock"), root.join("Gemfile.lock.release"))
-    ensure
-      FileUtils.rm_f(appliance_deps_file)
     end
   end
 end

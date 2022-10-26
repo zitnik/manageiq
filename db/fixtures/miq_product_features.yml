@@ -392,57 +392,61 @@
   :feature_type: node
   :identifier: service
   :children:
-  - :name: All Services
-    :description: Everything under All Services Accordion
-    :feature_type: node
-    :identifier: service_accord
+  - :name: View All Services
+    :description: View Services
+    :feature_type: view
+    :identifier: service_view
     :children:
-    - :name: View All Services
-      :description: View Services
+    - :name: List
+      :description: Display Lists of Services
       :feature_type: view
-      :identifier: service_view
-    - :name: Modify
-      :description: Modify Services
+      :identifier: service_show_list
+    - :name: Show
+      :description: Display Individual Cloud Providers
+      :feature_type: view
+      :identifier: service_show
+  - :name: Modify
+    :description: Modify Services
+    :feature_type: admin
+    :identifier: service_admin
+    :children:
+    - :name: Edit Services
+      :description: Edit Services
       :feature_type: admin
-      :identifier: service_admin
-      :children:
-      - :name: Edit Services
-        :description: Edit Services
-        :feature_type: admin
-        :identifier: service_edit
-      - :name: Remove Services
-        :description: Remove Services
-        :feature_type: admin
-        :identifier: service_delete
-      - :name: Set Ownership
-        :description: Set Ownership of Services
-        :feature_type: control
-        :identifier: service_ownership
-      - :name: Reconfigure Services
-        :description: Reconfigure Services Options
-        :feature_type: admin
-        :identifier: service_reconfigure
-    - :name: Operate
-      :description: Perform Operations on Services
+      :identifier: service_edit
+    - :name: Remove Services
+      :description: Remove Services
+      :feature_type: admin
+      :identifier: service_delete
+    - :name: Set Ownership
+      :description: Set Ownership of Services
       :feature_type: control
-      :identifier: service_control
-      :children:
-      - :name: Edit Tags
-        :description: Edit Tags of Services
-        :feature_type: control
-        :identifier: service_tag
-      - :name: Set Retirement Date
-        :description: Set Retirement Date for Services
-        :feature_type: control
-        :identifier: service_retire
-      - :name: Create Services
-        :description: Create Services
-        :feature_type: control
-        :identifier: service_create
-      - :name: Retire Services
-        :description: Retire Services
-        :feature_type: control
-        :identifier: service_retire_now
+      :identifier: service_ownership
+    - :name: Reconfigure Services
+      :description: Reconfigure Services Options
+      :feature_type: admin
+      :identifier: service_reconfigure
+  - :name: Operate
+    :description: Perform Operations on Services
+    :feature_type: control
+    :identifier: service_control
+    :children:
+    - :name: Edit Tags
+      :description: Edit Tags of Services
+      :feature_type: control
+      :identifier: service_tag
+    - :name: Set Retirement Date
+      :description: Set Retirement Date for Services
+      :feature_type: control
+      :identifier: service_retire
+    - :name: Create Services
+      :description: Create Services
+      :feature_type: control
+      :identifier: service_create
+    - :name: Retire Services
+      :description: Retire Services
+      :feature_type: control
+      :identifier: service_retire_now
 
 # EmsCloud
 - :name: Cloud Providers
@@ -827,6 +831,10 @@
       :description: Detach a Volume
       :feature_type: admin
       :identifier: cloud_volume_detach
+    - :name: Clone
+      :description: Clone a Volume
+      :feature_type: admin
+      :identifier: cloud_volume_clone
     - :name: Remove
       :description: Remove Volumes
       :feature_type: admin
@@ -889,6 +897,51 @@
       :description: Remove Key Pairs
       :feature_type: admin
       :identifier: auth_key_pair_cloud_delete
+
+# Placement Groups
+- :name: Placement Group
+  :description: Placement Group
+  :feature_type: node
+  :identifier: placement_group
+  :children:
+  - :name: View
+    :description: View Placement Group
+    :feature_type: view
+    :identifier: placement_group_view
+    :children:
+    - :name: List
+      :description: Display Lists of Placement Groups
+      :feature_type: view
+      :identifier: placement_group_show_list
+    - :name: Show
+      :description: Display Individual Placement Groups
+      :feature_type: view
+      :identifier: placement_group_show
+  - :name: Operate
+    :description: Perform Operations on Placement Groups
+    :feature_type: control
+    :identifier: placement_group_control
+    :children:
+    - :name: Edit Tags
+      :description: Edit Tags of Placement Group
+      :feature_type: control
+      :identifier: placement_group_edit
+    - :name: Add Placement Group
+      :description: Add Placement Group
+      :feature_type: control
+      :identifier: placement_group_add
+    - :name: Delete Placement Group
+      :description: Delete Placement Group
+      :feature_type: control
+      :identifier: placement_group_delete
+    - :name: Add VM to placement group
+      :description: Add VM to Placement Group
+      :feature_type: control
+      :identifier: placement_group_add_vm
+    - :name: Remove VM from  Placement Group
+      :description: Delete VM from Placement Group
+      :feature_type: control
+      :identifier: placement_group_remove_vm
 
 # CloudVolumeSnapshot
 - :name: Cloud Volume Snapshots
@@ -3756,10 +3809,6 @@
       :description: Show Capacity & Utilization data of Providers
       :feature_type: view
       :identifier: ems_container_perf
-    - :name: Ad hoc Metrics
-      :description: Show Ad hoc Metrics of Providers
-      :feature_type: view
-      :identifier: ems_container_ad_hoc_metrics
     - :name: Capture Metrics
       :description: Capture metrics related to this Containers Provider
       :feature_type: view
@@ -5516,6 +5565,10 @@
         :description: Reconfigure Instance
         :feature_type: control
         :identifier: instance_resize
+      - :name: Publish Instance to a Template
+        :description: Request to Publish Instance to a Template
+        :feature_type: control
+        :identifier: instance_publish
       - :name: Migrate Instance
         :description: Migrate Instance
         :feature_type: control
@@ -5858,6 +5911,11 @@
         :description: CPU/Memory Recommendations
         :feature_type: admin
         :identifier: vm_right_size
+      - :name: Resize VM
+        :description: Resize Cloud VM
+        :feature_type: admin
+        :identifier: vm_resize
+        :hidden: true
       - :name: Reconfigure VMs button
         :description: Reconfigure VM Memory/CPUs/...
         :feature_type: admin
@@ -6601,6 +6659,10 @@
       :description: Display Individual Physical Storage
       :feature_type: view
       :identifier: physical_storage_show
+    - :name: Timeline
+      :description: Display Timelines for Physical Storage
+      :feature_type: view
+      :identifier: physical_storage_timeline
   - :name: Operate
     :description: Perform Operations on Physical Storages
     :feature_type: control
@@ -6631,7 +6693,10 @@
       :description: Remove a Physical Storage
       :feature_type: admin
       :identifier: physical_storage_delete
-
+    - :name: Validate
+      :description: Validate a Physical Storage
+      :feature_type: admin
+      :identifier: physical_storage_validate
 # Physical Servers
 - :name: Physical Servers
   :description: Everything under Physical Servers

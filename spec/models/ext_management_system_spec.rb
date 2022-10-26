@@ -1,4 +1,6 @@
 RSpec.describe ExtManagementSystem do
+  include Spec::Support::SupportsHelper
+
   it "supports label mapping for provider subclasses" do
     expect(ExtManagementSystem.entities_for_label_mapping.keys).to include("VmOpenstack", "VmIBM")
   end
@@ -511,7 +513,6 @@ RSpec.describe ExtManagementSystem do
 
   context "#pause!" do
     before do
-      MiqRegion.seed
       Zone.seed
     end
 
@@ -573,7 +574,6 @@ RSpec.describe ExtManagementSystem do
 
   context "#resume" do
     before do
-      MiqRegion.seed
       Zone.seed
     end
 
@@ -676,7 +676,6 @@ RSpec.describe ExtManagementSystem do
 
   context "changing zone" do
     before do
-      MiqRegion.seed
       Zone.seed
     end
 
@@ -722,9 +721,7 @@ RSpec.describe ExtManagementSystem do
       ems.orchestrate_destroy
 
       # Simulate another process delivering the worker kill message
-      queue_message = MiqQueue.order(:id).first
-      status, message, result = queue_message.deliver
-      queue_message.delivered(status, message, result)
+      MiqQueue.order(:id).first.deliver_and_process
 
       expect(ExtManagementSystem.count).to eq(0)
       expect(worker.class.exists?(worker.id)).to eq(false)
@@ -808,13 +805,12 @@ RSpec.describe ExtManagementSystem do
     end
 
     def deliver_queue_message(queue_message = MiqQueue.order(:id).first)
-      status, message, result = queue_message.deliver
-      queue_message.delivered(status, message, result)
+      queue_message.deliver_and_process
     end
   end
 
   describe ".create_from_params" do
-    let(:zone)   { EvmSpecHelper.create_guid_miq_server_zone.last }
+    let(:zone)   { EvmSpecHelper.local_miq_server.zone }
     let(:params) { {"name" => "My Provider", "zone_id" => zone.id.to_s, "type" => "ManageIQ::Providers::Amazon::CloudManager", "provider_region" => "us-east-1"} }
     let(:endpoints) { [{"role" => "default"}] }
 
@@ -847,19 +843,45 @@ RSpec.describe ExtManagementSystem do
     end
   end
 
-  context "virtual column :supports_block_storage" do
+  context "virtual column :supports_block_storage (direct supports)" do
+    it "returns false if block storage is not supported" do
+      ems = FactoryBot.create(:ext_management_system)
+      stub_supports_not(ems.class, :block_storage)
+      expect(ems.supports?(:block_storage)).to eq(false)
+    end
+
     it "returns true if block storage is supported" do
       ems = FactoryBot.create(:ext_management_system)
-      allow(ems).to receive(:supports_block_storage).and_return(true)
-      expect(ems.supports_block_storage).to eq(true)
+      stub_supports(ems.class, :block_storage)
+      expect(ems.supports?(:block_storage)).to eq(true)
     end
   end
 
-  context "virtual column :supports_cloud_object_store_container_create" do
+  context "virtual column :supports_cloud_object_store_container_create (child class supports)" do
+    it "returns false if cloud_object_store_container_create is not supported" do
+      ems = FactoryBot.create(:ems_storage)
+      stub_supports_not(ems.class_by_ems("CloudObjectStoreContainer"), :create)
+      expect(ems.supports_cloud_object_store_container_create).to eq(false)
+    end
+
     it "returns true if cloud_object_store_container_create is supported" do
-      ems = FactoryBot.create(:ext_management_system)
-      allow(ems).to receive(:supports_cloud_object_store_container_create).and_return(true)
+      ems = FactoryBot.create(:ems_storage)
+      stub_supports(ems.class_by_ems("CloudObjectStoreContainer"), :create)
       expect(ems.supports_cloud_object_store_container_create).to eq(true)
+    end
+  end
+
+  context "virtual column :supports_cloud_database_create (child class supports)" do
+    it "returns false if cloud_object_store_container_create is not supported" do
+      ems = FactoryBot.create(:ems_cloud)
+      stub_supports_not(ems.class_by_ems("CloudDatabase"), :create)
+      expect(ems.supports_cloud_database_create).to eq(false)
+    end
+
+    it "returns true if cloud_database_create is supported" do
+      ems = FactoryBot.create(:ems_cloud)
+      stub_supports(ems.class_by_ems("CloudDatabase"), :create)
+      expect(ems.supports_cloud_database_create).to eq(true)
     end
   end
 
@@ -919,7 +941,7 @@ RSpec.describe ExtManagementSystem do
 
     it "defaults to false" do
       ems = ExtManagementSystem.new
-      expect(ems.supports_block_storage).to be(false)
+      expect(ems.supports?(:block_storage)).to be(false)
     end
 
     it "detects security group for provider" do

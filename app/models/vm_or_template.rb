@@ -30,8 +30,6 @@ class VmOrTemplate < ApplicationRecord
   include EventMixin
   include ProcessTasksMixin
   include TenancyMixin
-
-  include AvailabilityMixin
   include ManageIQ::Providers::Inflector::Methods
 
   VENDOR_TYPES = {
@@ -43,8 +41,8 @@ class VmOrTemplate < ApplicationRecord
     "xen"           => "XenSource",
     "parallels"     => "Parallels",
     "amazon"        => "Amazon",
-    "redhat"        => "RedHat",
-    "ovirt"         => "Ovirt",
+    "redhat"        => "Red Hat",
+    "ovirt"         => "oVirt",
     "openstack"     => "OpenStack",
     "oracle"        => "Oracle",
     "google"        => "Google",
@@ -75,6 +73,8 @@ class VmOrTemplate < ApplicationRecord
   belongs_to                :ems_cluster
   belongs_to                :cloud_tenant
   belongs_to                :flavor
+
+  belongs_to                :placement_group
 
   belongs_to                :storage
   belongs_to                :storage_profile
@@ -147,6 +147,7 @@ class VmOrTemplate < ApplicationRecord
   virtual_column :is_evm_appliance,                     :type => :boolean,    :uses => :miq_server
   virtual_column :os_image_name,                        :type => :string,     :uses => [:operating_system, :hardware]
   virtual_column :platform,                             :type => :string,     :uses => [:operating_system, :hardware]
+  virtual_column :product_name,                         :type => :string,     :uses => [:operating_system]
   virtual_column :vendor_display,                       :type => :string
   virtual_column :v_owning_cluster,                     :type => :string,     :uses => :ems_cluster
   virtual_column :v_owning_resource_pool,               :type => :string,     :uses => :all_relationships
@@ -243,7 +244,6 @@ class VmOrTemplate < ApplicationRecord
     'entitled_processors' => [:entitled_processors,  :float],
     'processor_type'      => [:processor_share_type, :string],
     'pin_policy'          => [:processor_pin_policy, :string],
-    'placement_group'     => [:placement_group,      :string],
     'software_licenses'   => [:software_licenses,    :string],
   }
   REQUIRED_ADVANCED_SETTINGS.each do |k, (m, t)|
@@ -252,7 +252,7 @@ class VmOrTemplate < ApplicationRecord
       return nil if as.nil? || as.value.nil?
 
       return case t
-             when :boolean then ActiveRecord::ConnectionAdapters::Column.value_to_boolean(as.value)
+             when :boolean then ActiveRecord::Type::Boolean.new.cast(as.value)
              when :integer then as.value.to_i
              when :float then as.value.to_f
              else as.value.to_s
@@ -1216,6 +1216,8 @@ class VmOrTemplate < ApplicationRecord
   end)
 
   def disconnected?
+    return self["disconnected"] if has_attribute?("disconnected")
+
     !connected_to_ems?
   end
   virtual_attribute :disconnected, :boolean, :arel => (lambda do |t|
@@ -1224,6 +1226,8 @@ class VmOrTemplate < ApplicationRecord
   alias_method :disconnected, :disconnected?
 
   def normalized_state
+    return self["normalized_state"] if has_attribute?("normalized_state")
+
     %w(archived orphaned template retired disconnected).each do |s|
       return s if send("#{s}?")
     end
@@ -1233,11 +1237,11 @@ class VmOrTemplate < ApplicationRecord
   virtual_attribute :normalized_state, :string, :arel => (lambda do |t|
     t.grouping(
       Arel::Nodes::Case.new
-      .when(arel_attribute(:archived)).then(Arel::Nodes::SqlLiteral.new("\'archived\'"))
-      .when(arel_attribute(:orphaned)).then(Arel::Nodes::SqlLiteral.new("\'orphaned\'"))
+      .when(arel_table[:archived]).then(Arel::Nodes::SqlLiteral.new("\'archived\'"))
+      .when(arel_table[:orphaned]).then(Arel::Nodes::SqlLiteral.new("\'orphaned\'"))
       .when(t[:template].eq(t.create_true)).then(Arel::Nodes::SqlLiteral.new("\'template\'"))
       .when(t[:retired].eq(t.create_true)).then(Arel::Nodes::SqlLiteral.new("\'retired\'"))
-      .when(arel_attribute(:disconnected)).then(Arel::Nodes::SqlLiteral.new("\'disconnected\'"))
+      .when(arel_table[:disconnected]).then(Arel::Nodes::SqlLiteral.new("\'disconnected\'"))
       .else(t.lower(
               Arel::Nodes::NamedFunction.new('COALESCE', [t[:power_state], Arel::Nodes::SqlLiteral.new("\'unknown\'")])
       ))
@@ -1671,11 +1675,7 @@ class VmOrTemplate < ApplicationRecord
     user
   end
 
-  supports :console do
-    unless console_supported?('spice') || console_supported?('vnc')
-      unsupported_reason_add(:console, N_("Console not supported"))
-    end
-  end
+  supports(:console) { N_("Console not supported") unless console_supported?('spice') || console_supported?('vnc') }
 
   def child_resources
     children

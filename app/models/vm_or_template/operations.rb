@@ -126,40 +126,30 @@ module VmOrTemplate::Operations
 
   included do
     supports :control do
-      msg = if retired?
-              _('The VM is retired')
-            elsif template?
-              _('The VM is a template')
-            elsif terminated?
-              _('The VM is terminated')
-            elsif !has_required_host?
-              _('The VM is not connected to a Host')
-            elsif disconnected?
-              _('The VM does not have a valid connection state')
-            elsif !has_active_ems?
-              _("The VM is not connected to an active Provider")
-            end
-      unsupported_reason_add(:control, msg) if msg
+      if retired?
+        _('The VM is retired')
+      elsif template?
+        _('The VM is a template')
+      elsif terminated?
+        _('The VM is terminated')
+      elsif !has_required_host?
+        _('The VM is not connected to a Host')
+      elsif disconnected?
+        _('The VM does not have a valid connection state')
+      elsif !has_active_ems?
+        _("The VM is not connected to an active Provider")
+      end
     end
     supports_not :clone
     supports_not :quick_stats
     supports_not :rename
     supports_not :terminate
-  end
-
-  def validate_vm_control_powered_on
-    validate_vm_control_power_state(true)
-  end
-
-  def validate_vm_control_power_state(check_powered_on)
-    unless supports?(:control)
-      return {:available => false, :message => unsupported_reason(:control)}
+    supports :vm_control_powered_on do
+      if !supports?(:control)
+        unsupported_reason_add(:vm_control_powered_on, unsupported_reason(:control))
+      elsif current_state != "on"
+        unsupported_reason_add(:vm_control_powered_on, "The VM is not powered on")
+      end
     end
-    return {:available => true,   :message => nil}  if current_state.send(check_powered_on ? "==" : "!=", "on")
-    {:available => false,  :message => "The VM is#{" not" if check_powered_on} powered on"}
-  end
-
-  def validate_unsupported(message_prefix)
-    {:available => false, :message => "#{message_prefix} is not available for #{self.class.model_suffix} VM or Template."}
   end
 end

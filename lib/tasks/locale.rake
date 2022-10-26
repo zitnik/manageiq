@@ -91,7 +91,7 @@ namespace :locale do
 
     yamls.each_key do |yaml_glob|
       yaml_glob_full = root_path.join(yaml_glob)
-      Dir.glob(yaml_glob_full).each do |file|
+      Dir.glob(yaml_glob_full).sort.each do |file|
         yml = YAML.load_file(file)
         parse_object(yml, yamls[yaml_glob], file, output, root_path.to_s)
       end
@@ -175,8 +175,15 @@ namespace :locale do
 
     pot_files = []
     Vmdb::Plugins.each do |plugin|
-      system('bundle', 'exec', 'rake', "locale:delete_pot_file[#{plugin.root}]") # Delete plugin's pot file if it exists to avoid weird file timestamp issues
-      raise unless system('bundle', 'exec', 'rake', "locale:plugin:find[#{plugin.to_s.sub('::Engine', '')}]")
+      # HACK: Rake tasks aren't re-invoked by default.  We need to reenable non-time based(FileTask) rake tasks
+      # so they can be run again in the context of each plugin.
+      #
+      # TODO: Rake tasks such as delete_pot_file, plugin:find, and report_changes take arguments and conflict with
+      # the assumption that rake makes:  already invoked tasks should not be invoked again as the result should be the same.
+      # We should make these methods with arguments and not use rake tasks in this way.
+      Rake.application.tasks.each { |t| t.reenable if (t.already_invoked && !t.kind_of?(Rake::FileTask)) }
+      Rake::Task['locale:delete_pot_file'].invoke(plugin.root) # Delete plugin's pot file if it exists to avoid weird file timestamp issues
+      Rake::Task['locale:plugin:find'].invoke(plugin.to_s.sub('::Engine', '')) # will warn and exit 1 if any engine fails
       pot_file = Dir.glob("#{plugin.root.join('locale')}/*.pot")[0]
       pot_files << pot_file if pot_file.present?
     end
@@ -195,9 +202,9 @@ namespace :locale do
       pot_files << pot_file
     end
 
-    system('rmsgcat', '-o', Rails.root.join('locale', 'manageiq-all.pot').to_s, Rails.root.join('locale', 'manageiq.pot').to_s, *pot_files)
+    system('rmsgcat', '--sort-by-msgid', '-o', Rails.root.join('locale', 'manageiq-all.pot').to_s, Rails.root.join('locale', 'manageiq.pot').to_s, *pot_files)
     system('mv', '-v', Rails.root.join('locale', 'manageiq-all.pot').to_s, Rails.root.join('locale', 'manageiq.pot').to_s)
-    system('rmsgmerge', '--no-fuzzy-matching', '-o', Rails.root.join('locale', 'en', 'manageiq-all.po').to_s, Rails.root.join('locale', 'en', 'manageiq.po').to_s, Rails.root.join('locale', 'manageiq.pot').to_s)
+    system('rmsgmerge', '--sort-by-msgid', '--no-fuzzy-matching', '-o', Rails.root.join('locale', 'en', 'manageiq-all.po').to_s, Rails.root.join('locale', 'en', 'manageiq.po').to_s, Rails.root.join('locale', 'manageiq.pot').to_s)
     system('mv', '-v', Rails.root.join('locale', 'en', 'manageiq-all.po').to_s, Rails.root.join('locale', 'en', 'manageiq.po').to_s)
     system('rm', '-rf', tmp_dir)
   end
@@ -243,7 +250,7 @@ namespace :locale do
       end
 
       def files_to_translate
-        Dir.glob("#{@engine_root}/{app,db,lib,config,locale}/**/*.{rb,erb,haml,slim,rhtml,js,jsx}")
+        Dir.glob("#{@engine_root}/{app,db,lib,config,locale}/**/*.{rb,erb,haml,slim,rhtml,js,jsx}").sort
       end
 
       def text_domain
@@ -276,7 +283,7 @@ namespace :locale do
       po_files = {}
 
       Vmdb::Gettext::Domains.po_paths.each do |path|
-        files = ::Pathname.glob(::File.join(path, "**", "*.po"))
+        files = ::Pathname.glob(::File.join(path, "**", "*.po")).sort
         files.each do |file|
           locale = file.dirname.basename.to_s
           po_files[locale] ||= []
@@ -298,7 +305,7 @@ namespace :locale do
         po = File.join(dir, 'manageiq.po')
         Dir.mkdir(dir, 0o700)
         puts "Generating po from\n#{files.sort.map { |f| "- #{f}" }.join("\n")}"
-        system "rmsgcat -o #{po} #{files.join(' ')}"
+        system "rmsgcat --sort-by-msgid -o #{po} #{files.join(' ')}"
         puts
       end
 

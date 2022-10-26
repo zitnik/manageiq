@@ -30,12 +30,11 @@ RSpec.describe ChargebackContainerImage do
   let(:metric_rollup_params) { {:parent_ems_id => ems.id, :tag_names => ""} }
 
   before do
-    MiqRegion.seed
     ChargebackRateDetailMeasure.seed
     ChargeableField.seed
     MiqEnterprise.seed
 
-    EvmSpecHelper.create_guid_miq_server_zone
+    EvmSpecHelper.local_miq_server
     @node = FactoryBot.create(:container_node, :name => "node")
     @image = FactoryBot.create(:container_image, :ext_management_system => ems)
     @label = FactoryBot.build(:custom_attribute, :name => "version/1.2/_label-1", :value => "test/1.0.0  rc_2", :section => 'docker_labels')

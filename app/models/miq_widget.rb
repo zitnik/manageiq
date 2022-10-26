@@ -32,13 +32,21 @@ class MiqWidget < ApplicationRecord
   include YAMLImportExportMixin
   acts_as_miq_set_member
 
-  WIDGET_DIR =  File.expand_path(File.join(Rails.root, "product/dashboard/widgets"))
   WIDGET_REPORT_SOURCE = "Generated for widget".freeze
 
-  before_destroy :destroy_schedule
+  before_destroy :destroy_schedule, :prevent_orphaned_dashboard
 
   def destroy_schedule
     miq_schedule.destroy if miq_schedule
+  end
+
+  def prevent_orphaned_dashboard
+    dependent_sets = MiqWidgetSet.select(:name, :set_data).all.select { |set| set.has_widget_id_member?(id) }
+
+    unless dependent_sets.empty?
+      errors.add(:base, _("Widget: #{title}(#{id}) must be removed from these dashboards before it can be removed: #{dependent_sets.collect(&:name).join(", ")}"))
+      throw(:abort)
+    end
   end
 
   virtual_column :status,         :type => :string,    :uses => :miq_task
@@ -201,22 +209,29 @@ class MiqWidget < ApplicationRecord
         options = generate_content_options(g, u)
         generate_content(*options)
       end
+      return
+    end
+
+    timeout_stalled_task
+
+    task = MiqTask.find_by(
+      :name   => "Generate Widget: '#{title}'",
+      :userid => User.current_userid || 'system',
+      :state  => %w[Queued Active]
+    )
+
+    if task
+      _log.warn("#{log_prefix} Skipping task creation for widget content generation. Task with name \"Generate Widget: '#{title}' already exists\"")
     else
-      timeout_stalled_task
-      if MiqTask.exists?(:name   => "Generate Widget: '#{title}'",
-                         :userid => User.current_userid || 'system',
-                         :state  => %w[Queued Active])
-        _log.warn("#{log_prefix} Skipping task creation for widget content generation. Task with name \"Generate Widget: '#{title}' already exists\"")
-      else
-        task = create_task(group_hash.length)
-        _log.info("#{log_prefix} Queueing Content Generation")
-        group_hash.each do |g, u|
-          options = generate_content_options(g, u)
-          queue_generate_content_for_users_or_group(*options)
-        end
-        task.id
+      task = create_task(group_hash.length)
+      _log.info("#{log_prefix} Queueing Content Generation")
+      group_hash.each do |g, u|
+        options = generate_content_options(g, u)
+        queue_generate_content_for_users_or_group(*options)
       end
     end
+
+    task.id
   end
 
   def generate_content(klass, group_description, userids, timezones = nil)
@@ -451,7 +466,7 @@ class MiqWidget < ApplicationRecord
   end
 
   def self.sync_from_dir
-    Dir.glob(File.join(WIDGET_DIR, "*.yaml")).sort.each { |f| sync_from_file(f) }
+    Vmdb::Plugins.miq_widgets_content.sort.each { |f| sync_from_file(f) }
   end
 
   def self.sync_from_file(filename)
@@ -547,13 +562,6 @@ class MiqWidget < ApplicationRecord
 
   def self.seed
     sync_from_dir
-  end
-
-  def self.seed_widget(pattern)
-    files = Dir.glob(File.join(WIDGET_DIR, "*#{pattern}*"))
-    files.collect do |f|
-      sync_from_file(f)
-    end
   end
 
   def save_with_shortcuts(shortcuts)  # [[<shortcut.id>, <widget_shortcut.description>], ...]

@@ -33,7 +33,7 @@ RSpec.configure do |config|
     c.syntax = :expect
   end
 
-  config.fixture_path = "#{::Rails.root}/spec/fixtures"
+  config.file_fixture_path = "#{::Rails.root}/spec/fixtures"
   config.use_transactional_fixtures = true
   config.use_instantiated_fixtures  = false
 
@@ -54,6 +54,15 @@ RSpec.configure do |config|
   # config.after(:all) do
   #   EvmSpecHelper.log_ruby_object_usage
   # end
+
+  # everything requires a region
+  config.before(:suite) do
+    MiqRegion.seed
+  end
+
+  config.after(:suite) do
+    MiqRegion.delete_all
+  end
 
   config.before do
     EmsRefresh.try(:debug_failures=, true)

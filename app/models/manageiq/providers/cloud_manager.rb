@@ -27,6 +27,7 @@ module ManageIQ::Providers
     has_many :cloud_object_store_objects,    :foreign_key => :ems_id, :dependent => :destroy
     has_many :cloud_services,                :foreign_key => :ems_id, :dependent => :destroy
     has_many :cloud_databases,               :foreign_key => :ems_id, :dependent => :destroy
+    has_many :cloud_database_servers,        :foreign_key => :ems_id, :dependent => :destroy
     has_many :key_pairs,                     :class_name  => "AuthKeyPair", :as => :resource, :dependent => :destroy
     has_many :host_aggregates,               :foreign_key => :ems_id, :dependent => :destroy
     has_many :resource_groups,               :foreign_key => :ems_id, :dependent => :destroy, :inverse_of => :ext_management_system
@@ -42,6 +43,7 @@ module ManageIQ::Providers
     virtual_has_many :volume_availability_zones, :class_name => "AvailabilityZone", :uses => :availability_zones
 
     supports_not :auth_key_pair_create
+    supports     :authentication_status
     supports_not :cinder_service
     supports_not :cloud_tenants
     supports_not :cloud_volume
@@ -71,10 +73,6 @@ module ManageIQ::Providers
       raise NotImplementedError unless Rails.env.development?
       require 'util/miq-system'
       MiqSystem.open_browser(browser_url)
-    end
-
-    def validate_authentication_status
-      {:available => true, :message => nil}
     end
 
     def stop_event_monitor_queue_on_credential_change
